@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — LYC Jr Sailing{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Admin Dashboard</h2>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <h3 class="mb-0">{{ upcoming|length }}</h3>
+        <small class="text-muted">Upcoming Sessions</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <h3 class="mb-0">{{ upcoming | selectattr('status', 'equalto', 'confirmed') | list | length }}</h3>
+        <small class="text-muted">Confirmed</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <h3 class="mb-0">{{ total_sailors }}</h3>
+        <small class="text-muted">Registered Sailors</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center">
+      <div class="card-body">
+        <h3 class="mb-0">{{ total_parents }}</h3>
+        <small class="text-muted">Parent Accounts</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Upcoming Sessions</h5>
+  <a href="{{ url_for('admin.new_session') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg"></i> New Session
+  </a>
+</div>
+
+{% if not upcoming %}
+<div class="alert alert-info">No upcoming sessions. <a href="{{ url_for('admin.new_session') }}">Create one.</a></div>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Fleet</th>
+        <th>Status</th>
+        <th>Committed</th>
+        <th>Interested</th>
+        <th>Deadline</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in upcoming %}
+      <tr>
+        <td>{{ s.date.strftime('%b %-d, %Y') }}</td>
+        <td>{{ s.fleet.name }}</td>
+        <td>
+          {% if s.status == 'confirmed' %}
+            <span class="badge bg-success">Confirmed</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </td>
+        <td>{{ s.commitment_count }} / {{ s.min_sailors }}</td>
+        <td>{{ s.interest_count }}</td>
+        <td class="{{ 'text-danger' if s.is_past_deadline else '' }}">
+          {{ s.commitment_deadline.strftime('%b %-d') }}
+        </td>
+        <td>
+          <a href="{{ url_for('admin.session_detail', session_id=s.id) }}"
+             class="btn btn-sm btn-outline-secondary">View</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="row g-3 mt-2">
+  {% for fleet in fleets %}
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <span class="fw-bold">{{ fleet.name }}</span>
+        <span class="text-muted">{{ fleet.sailors|length }} sailors</span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="col-md-4">
+    <a href="{{ url_for('admin.fleets') }}" class="card text-decoration-none text-muted h-100">
+      <div class="card-body d-flex align-items-center">
+        <i class="bi bi-plus-circle me-2"></i> Manage Fleets
+      </div>
+    </a>
+  </div>
+</div>
+{% endblock %}

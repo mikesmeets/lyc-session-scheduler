@@ -1,8 +1,107 @@
 {% extends "base.html" %}
-
-{% block title %}Home — LYC Jr Sailing Training{% endblock %}
+{% block title %}Schedule — LYC Jr Sailing{% endblock %}
 
 {% block content %}
-<h1>Welcome to LYC Junior Sailing Training</h1>
-<p>Your training app is up and running.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Upcoming Practice Sessions</h2>
+  {% if not current_user.is_authenticated %}
+  <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-person-plus"></i> Register to sign up
+  </a>
+  {% endif %}
+</div>
+
+{# Fleet filter tabs #}
+<div class="mb-4">
+  <a href="{{ url_for('main.index') }}"
+     class="btn btn-sm {{ 'btn-primary' if not selected_fleet else 'btn-outline-primary' }} me-1">
+    All Fleets
+  </a>
+  {% for fleet in fleets %}
+  <a href="{{ url_for('main.index', fleet_id=fleet.id) }}"
+     class="btn btn-sm {{ 'btn-primary' if selected_fleet == fleet.id else 'btn-outline-primary' }} me-1">
+    {{ fleet.name }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if not sessions %}
+<div class="alert alert-info">No upcoming sessions scheduled.</div>
+{% else %}
+<div class="row g-3">
+  {% for s in sessions %}
+  {% set deadline_passed = s.is_past_deadline %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card card-session h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-bold">{{ s.fleet.name }}</span>
+        {% if s.status == 'confirmed' %}
+          <span class="badge bg-success">Confirmed</span>
+        {% elif s.status == 'cancelled' %}
+          <span class="badge bg-secondary">Cancelled</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">Pending</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <h5 class="card-title mb-1">
+          <i class="bi bi-calendar3"></i>
+          {{ s.date.strftime('%A, %B %-d, %Y') }}
+        </h5>
+        {% if s.start_time %}
+        <p class="text-muted mb-2">
+          <i class="bi bi-clock"></i>
+          {{ s.start_time }}{% if s.end_time %} – {{ s.end_time }}{% endif %}
+        </p>
+        {% endif %}
+
+        {# Commitment progress #}
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small mb-1">
+            <span>{{ s.commitment_count }} / {{ s.min_sailors }} committed</span>
+            <span class="text-muted">{{ s.interest_count }} interested</span>
+          </div>
+          <div class="progress">
+            <div class="progress-bar {{ 'bg-success' if s.status == 'confirmed' else 'bg-primary' }}"
+                 style="width: {{ [s.commitment_count / s.min_sailors * 100, 100]|min }}%"></div>
+          </div>
+        </div>
+
+        <p class="small text-muted mb-0">
+          <i class="bi bi-hourglass-split"></i>
+          Deadline: {{ s.commitment_deadline.strftime('%b %-d') }}
+          {% if deadline_passed %}<span class="text-danger">(passed)</span>{% endif %}
+        </p>
+
+        {% if s.notes %}
+        <p class="small mt-2 mb-0 text-muted">{{ s.notes }}</p>
+        {% endif %}
+
+        {# Show parent's sailors' signup status #}
+        {% if current_user.is_authenticated and not current_user.is_admin %}
+          {% set session_signups = parent_signups.get(s.id, {}) %}
+          {% set my_fleet_sailors = current_user.sailors | selectattr('fleet_id', 'equalto', s.fleet_id) | list %}
+          {% if my_fleet_sailors %}
+          <div class="mt-2 border-top pt-2">
+            {% for sailor in my_fleet_sailors %}
+              {% set signup = session_signups.get(sailor.id) %}
+              <span class="badge {{ 'bg-success' if signup and signup.signup_type == 'commitment' else ('bg-info text-dark' if signup else 'bg-light text-muted border') }} me-1">
+                {{ sailor.name }}: {{ signup.signup_type if signup else 'not signed up' }}
+              </span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="card-footer">
+        <a href="{{ url_for('main.session_detail', session_id=s.id) }}"
+           class="btn btn-sm btn-outline-primary w-100">
+          View &amp; Sign Up
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

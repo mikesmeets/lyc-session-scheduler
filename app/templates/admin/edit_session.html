@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Edit Session — Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7">
+    <h2 class="mb-4">Edit Session</h2>
+    <div class="card">
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Fleet</label>
+            <select name="fleet_id" class="form-select" required>
+              {% for fleet in fleets %}
+              <option value="{{ fleet.id }}" {{ 'selected' if fleet.id == session.fleet_id }}>{{ fleet.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" name="date" class="form-control"
+                   value="{{ session.date.strftime('%Y-%m-%d') }}" required>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">Start Time</label>
+              <input type="time" name="start_time" class="form-control"
+                     value="{{ session.start_time or '' }}">
+            </div>
+            <div class="col">
+              <label class="form-label">End Time</label>
+              <input type="time" name="end_time" class="form-control"
+                     value="{{ session.end_time or '' }}">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">Commitment Deadline</label>
+              <div class="input-group">
+                <input type="number" name="commitment_deadline_days" class="form-control"
+                       value="{{ session.commitment_deadline_days }}" min="1" max="90" required>
+                <span class="input-group-text">days before</span>
+              </div>
+            </div>
+            <div class="col">
+              <label class="form-label">Min Sailors to Confirm</label>
+              <input type="number" name="min_sailors" class="form-control"
+                     value="{{ session.min_sailors }}" min="1" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="3">{{ session.notes or '' }}</textarea>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ url_for('admin.session_detail', session_id=session.id) }}"
+               class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Manage Fleets — Admin{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Manage Fleets</h2>
+
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header fw-bold">Add Fleet</div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Fleet Name</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Opti Blue" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Add Fleet</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header fw-bold">All Fleets</div>
+      {% if fleets %}
+      <ul class="list-group list-group-flush">
+        {% for fleet in fleets %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ fleet.name }}</strong>
+            <span class="text-muted ms-3">
+              {{ fleet.sailors|length }} sailor(s) &middot; {{ fleet.sessions|length }} session(s)
+            </span>
+          </div>
+          <form method="POST" action="{{ url_for('admin.delete_fleet', fleet_id=fleet.id) }}"
+                onsubmit="return confirm('Delete {{ fleet.name }}? This cannot be undone.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit"
+                    {{ 'disabled' if fleet.sessions or fleet.sailors }}>
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">No fleets yet.</div>
+      {% endif %}
+    </div>
+    <p class="text-muted small mt-2">Fleets with sessions or registered sailors cannot be deleted.</p>
+  </div>
+</div>
+{% endblock %}

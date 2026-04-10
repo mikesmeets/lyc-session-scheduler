@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Sessions — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">All Sessions</h2>
+  <a href="{{ url_for('admin.new_session') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg"></i> New Session
+  </a>
+</div>
+
+{# Fleet filter #}
+<div class="mb-3">
+  <a href="{{ url_for('admin.sessions') }}"
+     class="btn btn-sm {{ 'btn-secondary' if not selected_fleet else 'btn-outline-secondary' }} me-1">All</a>
+  {% for fleet in fleets %}
+  <a href="{{ url_for('admin.sessions', fleet_id=fleet.id) }}"
+     class="btn btn-sm {{ 'btn-secondary' if selected_fleet == fleet.id else 'btn-outline-secondary' }} me-1">
+    {{ fleet.name }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if not sessions %}
+<div class="alert alert-info">No sessions found.</div>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Fleet</th>
+        <th>Status</th>
+        <th>Committed / Min</th>
+        <th>Deadline</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr class="{{ 'table-secondary' if s.status == 'cancelled' else '' }}">
+        <td>{{ s.date.strftime('%b %-d, %Y') }}</td>
+        <td>{{ s.fleet.name }}</td>
+        <td>
+          {% if s.status == 'confirmed' %}
+            <span class="badge bg-success">Confirmed</span>
+          {% elif s.status == 'cancelled' %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </td>
+        <td>{{ s.commitment_count }} / {{ s.min_sailors }}</td>
+        <td class="{{ 'text-danger' if s.date >= today and s.is_past_deadline else '' }}">
+          {{ s.commitment_deadline.strftime('%b %-d') }}
+        </td>
+        <td>
+          <a href="{{ url_for('admin.session_detail', session_id=s.id) }}"
+             class="btn btn-sm btn-outline-secondary">View</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
