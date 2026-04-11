@@ -14,7 +14,15 @@ csrf = CSRFProtect()
 def create_app():
     app = Flask(__name__, instance_relative_config=True)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'sailing.db')
+
+    # Use Postgres on Railway (DATABASE_URL set automatically), SQLite locally
+    database_url = os.environ.get('DATABASE_URL', '')
+    if database_url.startswith('postgres://'):
+        # SQLAlchemy requires postgresql:// not postgres://
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url or (
+        'sqlite:///' + os.path.join(app.instance_path, 'sailing.db')
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     os.makedirs(app.instance_path, exist_ok=True)
