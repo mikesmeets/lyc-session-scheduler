@@ -349,6 +349,106 @@ def delete_waiver_link(link_id):
     return redirect(url_for('admin.waiver_links'))
 
 
+# ── User Management ───────────────────────────────────────────────────────────
+
+@admin_bp.route('/users')
+@login_required
+@admin_required
+def users():
+    all_users = User.query.order_by(User.is_admin.desc(), User.last_name, User.first_name).all()
+    return render_template('admin/users.html', users=all_users)
+
+
+@admin_bp.route('/users/new', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def new_user():
+    if request.method == 'POST':
+        first_name  = request.form.get('first_name', '').strip()
+        last_name   = request.form.get('last_name', '').strip()
+        email       = request.form.get('email', '').strip().lower()
+        audit_number = request.form.get('audit_number', '').strip()
+        password    = request.form.get('password', '')
+        is_admin    = request.form.get('is_admin') == '1'
+
+        if not first_name or not last_name or not email or not password:
+            flash('First name, last name, email, and password are required.', 'danger')
+            return render_template('admin/user_form.html', action='new')
+
+        if User.query.filter_by(email=email).first():
+            flash('An account with that email already exists.', 'danger')
+            return render_template('admin/user_form.html', action='new')
+
+        user = User(
+            first_name=first_name,
+            last_name=last_name,
+            email=email,
+            audit_number=audit_number or None,
+            is_admin=is_admin,
+        )
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        flash(f'Account created for {user.name}.', 'success')
+        return redirect(url_for('admin.users'))
+
+    return render_template('admin/user_form.html', action='new')
+
+
+@admin_bp.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_user(user_id):
+    user = User.query.get_or_404(user_id)
+    if request.method == 'POST':
+        user.first_name   = request.form.get('first_name', '').strip()
+        user.last_name    = request.form.get('last_name', '').strip()
+        user.audit_number = request.form.get('audit_number', '').strip() or None
+        new_email = request.form.get('email', '').strip().lower()
+        is_admin  = request.form.get('is_admin') == '1'
+
+        if not user.first_name or not user.last_name or not new_email:
+            flash('First name, last name, and email are required.', 'danger')
+            return render_template('admin/user_form.html', action='edit', user=user)
+
+        if new_email != user.email and User.query.filter_by(email=new_email).first():
+            flash('That email is already in use.', 'danger')
+            return render_template('admin/user_form.html', action='edit', user=user)
+
+        # Prevent removing your own admin
+        if user.id == current_user.id and not is_admin:
+            flash('You cannot remove your own admin access.', 'danger')
+            return render_template('admin/user_form.html', action='edit', user=user)
+
+        user.email    = new_email
+        user.is_admin = is_admin
+
+        new_password = request.form.get('password', '').strip()
+        if new_password:
+            user.set_password(new_password)
+
+        db.session.commit()
+        flash(f'Updated {user.name}.', 'success')
+        return redirect(url_for('admin.users'))
+
+    return render_template('admin/user_form.html', action='edit', user=user)
+
+
+@admin_bp.route('/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash('You cannot delete your own account.', 'danger')
+        return redirect(url_for('admin.users'))
+    name = user.name
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Deleted account for {name}.', 'success')
+    return redirect(url_for('admin.users'))
+
+
 # ── Settings ──────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/settings', methods=['GET', 'POST'])
