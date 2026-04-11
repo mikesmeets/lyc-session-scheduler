@@ -45,6 +45,10 @@
             <li><a class="dropdown-item" href="{{ url_for('admin.new_session') }}">+ New Session</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" href="{{ url_for('admin.fleets') }}">Fleets</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.sailors') }}">Sailors &amp; Waivers</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.waiver_links') }}">Waiver Links</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin.settings') }}">Settings</a></li>
           </ul>
         </li>
         {% endif %}

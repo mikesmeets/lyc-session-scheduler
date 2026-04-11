@@ -4,6 +4,17 @@
 {% block content %}
 <h2 class="mb-4">Manage Fleets</h2>
 
+{% set palette = [
+  ('#ffffff', 'White'),
+  ('#d4edda', 'Light Green'),
+  ('#d1ecf1', 'Light Blue'),
+  ('#fff3cd', 'Light Yellow'),
+  ('#f8d7da', 'Light Pink'),
+  ('#e2d9f3', 'Light Purple'),
+  ('#fde8d0', 'Light Orange'),
+  ('#e9ecef', 'Light Gray'),
+] %}
+
 <div class="row g-4">
   <div class="col-md-4">
     <div class="card">
@@ -14,6 +25,17 @@
           <div class="mb-3">
             <label class="form-label">Fleet Name</label>
             <input type="text" name="name" class="form-control" placeholder="e.g. Opti Blue" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Color</label>
+            <div class="d-flex gap-2 flex-wrap mb-1">
+              {% for hex, label in palette %}
+              <button type="button" class="swatch" data-color="{{ hex }}" data-target="add-color"
+                      title="{{ label }}"
+                      style="width:28px;height:28px;background:{{ hex }};border:2px solid #aaa;border-radius:4px;cursor:pointer;"></button>
+              {% endfor %}
+            </div>
+            <input type="hidden" name="color" id="add-color" value="#ffffff">
           </div>
           <button type="submit" class="btn btn-primary w-100">Add Fleet</button>
         </form>
@@ -27,21 +49,40 @@
       {% if fleets %}
       <ul class="list-group list-group-flush">
         {% for fleet in fleets %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ fleet.name }}</strong>
-            <span class="text-muted ms-3">
-              {{ fleet.sailors|length }} sailor(s) &middot; {{ fleet.sessions|length }} session(s)
-            </span>
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-3">
+              <div style="width:20px;height:20px;background:{{ fleet.color }};border:1px solid #aaa;border-radius:3px;"></div>
+              <div>
+                <strong>{{ fleet.name }}</strong>
+                <span class="text-muted ms-2">{{ fleet.sailors|length }} sailor(s) &middot; {{ fleet.sessions|length }} session(s)</span>
+              </div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              {# Color picker #}
+              <form method="POST" action="{{ url_for('admin.update_fleet_color', fleet_id=fleet.id) }}" class="d-flex align-items-center gap-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="d-flex gap-1 flex-wrap" style="max-width:220px">
+                  {% for hex, label in palette %}
+                  <button type="button" class="swatch" data-color="{{ hex }}" data-target="color-{{ fleet.id }}"
+                          title="{{ label }}"
+                          style="width:22px;height:22px;background:{{ hex }};border:2px solid {{ '#333' if fleet.color == hex else '#aaa' }};border-radius:3px;cursor:pointer;"></button>
+                  {% endfor %}
+                </div>
+                <input type="hidden" name="color" id="color-{{ fleet.id }}" value="{{ fleet.color }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary ms-1">Set</button>
+              </form>
+              {# Delete #}
+              <form method="POST" action="{{ url_for('admin.delete_fleet', fleet_id=fleet.id) }}"
+                    onsubmit="return confirm('Delete {{ fleet.name }}?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit"
+                        {{ 'disabled' if fleet.sessions or fleet.sailors }}>
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
           </div>
-          <form method="POST" action="{{ url_for('admin.delete_fleet', fleet_id=fleet.id) }}"
-                onsubmit="return confirm('Delete {{ fleet.name }}? This cannot be undone.')">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-outline-danger" type="submit"
-                    {{ 'disabled' if fleet.sessions or fleet.sailors }}>
-              <i class="bi bi-trash"></i>
-            </button>
-          </form>
         </li>
         {% endfor %}
       </ul>
@@ -52,4 +93,20 @@
     <p class="text-muted small mt-2">Fleets with sessions or registered sailors cannot be deleted.</p>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.target;
+      document.getElementById(targetId).value = btn.dataset.color;
+      // Highlight selected swatch within the same group
+      document.querySelectorAll(`[data-target="${targetId}"]`).forEach(b => {
+        b.style.border = '2px solid #aaa';
+      });
+      btn.style.border = '2px solid #333';
+    });
+  });
+</script>
 {% endblock %}

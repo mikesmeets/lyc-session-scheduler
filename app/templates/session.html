@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ session.fleet.name }} — {{ session.date.strftime('%b %-d, %Y') }}{% endblock %}
+{% block title %}{{ session.fleet.name }} — {{ session.date.strftime('%b %#d, %Y') }}{% endblock %}
 
 {% block content %}
 <a href="{{ url_for('main.index') }}" class="btn btn-sm btn-outline-secondary mb-3">
@@ -12,16 +12,25 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span class="fw-bold">{{ session.fleet.name }}</span>
-        {% if session.status == 'confirmed' %}
-          <span class="badge bg-success fs-6">Confirmed</span>
-        {% elif session.status == 'cancelled' %}
-          <span class="badge bg-secondary fs-6">Cancelled</span>
-        {% else %}
-          <span class="badge bg-warning text-dark fs-6">Pending</span>
-        {% endif %}
+        <div class="d-flex gap-1">
+          {% if session.session_type == 'morning' %}
+            <span class="badge bg-warning text-dark">Morning</span>
+          {% elif session.session_type == 'afternoon' %}
+            <span class="badge bg-info text-dark">Afternoon</span>
+          {% else %}
+            <span class="badge bg-secondary">Full Day</span>
+          {% endif %}
+          {% if session.status == 'confirmed' %}
+            <span class="badge bg-success">Confirmed</span>
+          {% elif session.status == 'cancelled' %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% else %}
+            <span class="badge bg-light text-dark border">Pending</span>
+          {% endif %}
+        </div>
       </div>
       <div class="card-body">
-        <h4 class="mb-3">{{ session.date.strftime('%A, %B %-d, %Y') }}</h4>
+        <h4 class="mb-3">{{ session.date.strftime('%A, %B %#d, %Y') }}</h4>
         {% if session.start_time %}
         <p><i class="bi bi-clock me-1"></i>
           {{ session.start_time }}{% if session.end_time %} – {{ session.end_time }}{% endif %}
@@ -29,7 +38,7 @@
         {% endif %}
         <p>
           <i class="bi bi-hourglass-split me-1"></i>
-          Commitment deadline: <strong>{{ session.commitment_deadline.strftime('%B %-d, %Y') }}</strong>
+          Commitment deadline: <strong>{{ session.commitment_deadline.strftime('%B %#d, %Y') }}</strong>
           {% if session.is_past_deadline %}
             <span class="badge bg-danger ms-1">Deadline passed</span>
           {% endif %}
@@ -39,6 +48,8 @@
         {% endif %}
 
         {# Progress #}
+        {% set committed_pct = [session.commitment_count / session.min_sailors * 100, 100] | min %}
+        {% set interest_pct  = [session.interest_count  / session.min_sailors * 100, 100 - committed_pct] | min %}
         <div class="mt-3">
           <div class="d-flex justify-content-between small mb-1">
             <span><strong>{{ session.commitment_count }}</strong> / {{ session.min_sailors }} committed</span>
@@ -46,8 +57,9 @@
           </div>
           <div class="progress mb-1" style="height:14px">
             <div class="progress-bar {{ 'bg-success' if session.status == 'confirmed' else 'bg-primary' }}"
-                 style="width: {{ [session.commitment_count / session.min_sailors * 100, 100]|min }}%">
-            </div>
+                 style="width: {{ committed_pct }}%"></div>
+            <div class="progress-bar bg-warning"
+                 style="width: {{ interest_pct }}%"></div>
           </div>
           {% if session.status == 'pending' %}
           <small class="text-muted">
@@ -74,54 +86,85 @@
         <div class="alert alert-secondary">This session has been cancelled.</div>
       {% elif session.is_past_deadline %}
         <div class="alert alert-warning">The signup deadline has passed — changes are no longer accepted.</div>
-      {% elif not my_sailors %}
+      {% elif not my_sailors and not my_other_sailors %}
         <div class="alert alert-info">
-          You have no sailors registered in <strong>{{ session.fleet.name }}</strong>.
-          <a href="{{ url_for('main.my_sailors') }}">Add a sailor</a> to sign up.
+          You have no registered sailors. <a href="{{ url_for('main.my_sailors') }}">Add a sailor</a> to sign up.
         </div>
       {% else %}
+        {# Macro for signup buttons — reused for both in-fleet and out-of-fleet #}
+        {% macro signup_row(sailor, cross_fleet=false) %}
+        {% set existing = my_signups.get(sailor.id) %}
+        <div class="mb-3 pb-3 border-bottom">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <strong>{{ sailor.name }}</strong>
+              {% if cross_fleet %}
+                <span class="badge bg-secondary ms-1">{{ sailor.fleet.name }}</span>
+              {% endif %}
+              {% if existing %}
+                <span class="badge {{ 'bg-success' if existing.signup_type == 'commitment' else 'bg-info text-dark' }} ms-1">
+                  {{ existing.signup_type }}
+                </span>
+              {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+              <form method="POST" action="{{ url_for('main.session_signup', session_id=session.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="sailor_id" value="{{ sailor.id }}">
+                <input type="hidden" name="signup_type" value="interest">
+                {% if cross_fleet %}<input type="hidden" name="confirm_cross_fleet" value="1">{% endif %}
+                <button class="btn btn-sm {{ 'btn-info' if existing and existing.signup_type == 'interest' else 'btn-outline-info' }}"
+                        type="submit">Interest</button>
+              </form>
+              <form method="POST" action="{{ url_for('main.session_signup', session_id=session.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="sailor_id" value="{{ sailor.id }}">
+                <input type="hidden" name="signup_type" value="commitment">
+                {% if cross_fleet %}<input type="hidden" name="confirm_cross_fleet" value="1">{% endif %}
+                <button class="btn btn-sm {{ 'btn-success' if existing and existing.signup_type == 'commitment' else 'btn-outline-success' }}"
+                        type="submit">Commit</button>
+              </form>
+              {% if existing %}
+              <form method="POST" action="{{ url_for('main.session_unsignup', session_id=session.id, sailor_id=sailor.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit" title="Remove">
+                  <i class="bi bi-x"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endmacro %}
+
+        {% if my_sailors %}
         <div class="card mb-3">
           <div class="card-header fw-bold">Sign Up Your Sailors</div>
           <div class="card-body">
             {% for sailor in my_sailors %}
-            {% set existing = my_signups.get(sailor.id) %}
-            <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
-              <div>
-                <strong>{{ sailor.name }}</strong>
-                {% if existing %}
-                  <span class="badge {{ 'bg-success' if existing.signup_type == 'commitment' else 'bg-info text-dark' }} ms-2">
-                    {{ existing.signup_type }}
-                  </span>
-                {% endif %}
-              </div>
-              <div class="d-flex gap-2">
-                <form method="POST" action="{{ url_for('main.session_signup', session_id=session.id) }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <input type="hidden" name="sailor_id" value="{{ sailor.id }}">
-                  <input type="hidden" name="signup_type" value="interest">
-                  <button class="btn btn-sm {{ 'btn-info' if existing and existing.signup_type == 'interest' else 'btn-outline-info' }}"
-                          type="submit">Interest</button>
-                </form>
-                <form method="POST" action="{{ url_for('main.session_signup', session_id=session.id) }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <input type="hidden" name="sailor_id" value="{{ sailor.id }}">
-                  <input type="hidden" name="signup_type" value="commitment">
-                  <button class="btn btn-sm {{ 'btn-success' if existing and existing.signup_type == 'commitment' else 'btn-outline-success' }}"
-                          type="submit">Commit</button>
-                </form>
-                {% if existing %}
-                <form method="POST" action="{{ url_for('main.session_unsignup', session_id=session.id, sailor_id=sailor.id) }}">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button class="btn btn-sm btn-outline-danger" type="submit" title="Remove">
-                    <i class="bi bi-x"></i>
-                  </button>
-                </form>
-                {% endif %}
-              </div>
-            </div>
+              {{ signup_row(sailor) }}
             {% endfor %}
           </div>
         </div>
+        {% endif %}
+
+        {% if my_other_sailors %}
+        <div class="card mb-3">
+          <div class="card-header fw-bold d-flex align-items-center gap-2">
+            Other Sailors
+            <span class="badge bg-secondary fw-normal">outside {{ session.fleet.name }}</span>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted mb-3">
+              <i class="bi bi-info-circle"></i>
+              These sailors are registered in a different fleet. You can still sign them up for this session.
+            </p>
+            {% for sailor in my_other_sailors %}
+              {{ signup_row(sailor, cross_fleet=true) }}
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
       {% endif %}
     {% elif not current_user.is_authenticated %}
     <div class="alert alert-info">

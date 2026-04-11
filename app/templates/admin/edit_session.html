@@ -10,6 +10,26 @@
         <form method="POST">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="mb-3">
+            <label class="form-label">Session Type</label>
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="session_type" value="morning" id="type_morning"
+                       {{ 'checked' if session.session_type == 'morning' }}>
+                <label class="form-check-label" for="type_morning">Morning</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="session_type" value="afternoon" id="type_afternoon"
+                       {{ 'checked' if session.session_type == 'afternoon' }}>
+                <label class="form-check-label" for="type_afternoon">Afternoon</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="session_type" value="full_day" id="type_full_day"
+                       {{ 'checked' if session.session_type == 'full_day' }}>
+                <label class="form-check-label" for="type_full_day">Full Day</label>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
             <label class="form-label">Fleet</label>
             <select name="fleet_id" class="form-select" required>
               {% for fleet in fleets %}

@@ -2,99 +2,623 @@
 {% block title %}Schedule — LYC Jr Sailing{% endblock %}
 
 {% block content %}
+
+{# ── Derived helpers ───────────────────────────────────────────────────────── #}
+{% set is_parent = current_user.is_authenticated and not current_user.is_admin %}
+{% set my_sailors_list = current_user.sailors | list if is_parent else [] %}
+
+{# Resolve selected sailor object #}
+{% set selected_sailor = namespace(obj=none) %}
+{% if selected_sailor_id %}
+  {% for s in my_sailors_list %}
+    {% if s.id == selected_sailor_id %}{% set selected_sailor.obj = s %}{% endif %}
+  {% endfor %}
+{% endif %}
+
+{# ── Signup button macro ───────────────────────────────────────────────────── #}
+{% macro signup_btns(sess, sailor, signup, next_url) %}
+  {% set past = sess.is_past_deadline or sess.status == 'cancelled' %}
+  <div class="btn-group btn-group-sm" role="group">
+    {# Interest button #}
+    <form method="post" action="{{ url_for('main.session_signup', session_id=sess.id) }}" class="d-inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="sailor_id" value="{{ sailor.id }}">
+      <input type="hidden" name="signup_type" value="interest">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <button type="submit"
+        class="btn btn-sm {{ 'btn-warning' if signup and signup.signup_type == 'interest' else 'btn-outline-warning' }}"
+        {% if past %}disabled{% endif %}
+        title="Interested">
+        <i class="bi bi-star{% if signup and signup.signup_type == 'interest' %}-fill{% endif %}"></i>
+      </button>
+    </form>
+    {# Commitment button #}
+    <form method="post" action="{{ url_for('main.session_signup', session_id=sess.id) }}" class="d-inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="sailor_id" value="{{ sailor.id }}">
+      <input type="hidden" name="signup_type" value="commitment">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <button type="submit"
+        class="btn btn-sm {{ 'btn-success' if signup and signup.signup_type == 'commitment' else 'btn-outline-success' }}"
+        {% if past %}disabled{% endif %}
+        title="Committed">
+        <i class="bi bi-check-circle{% if signup and signup.signup_type == 'commitment' %}-fill{% endif %}"></i>
+      </button>
+    </form>
+    {# Remove button (only if signed up) #}
+    {% if signup %}
+    <form method="post" action="{{ url_for('main.session_unsignup', session_id=sess.id, sailor_id=sailor.id) }}" class="d-inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      <button type="submit"
+        class="btn btn-sm btn-outline-danger"
+        {% if past %}disabled{% endif %}
+        title="Remove">
+        <i class="bi bi-x"></i>
+      </button>
+    </form>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# ── Status badge macro (read-only) ───────────────────────────────────────── #}
+{% macro status_badge(signup) %}
+  {% if signup %}
+    {% if signup.signup_type == 'commitment' %}
+      <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Committed</span>
+    {% else %}
+      <span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i>Interested</span>
+    {% endif %}
+  {% else %}
+    <span class="badge bg-light text-muted border">Not signed up</span>
+  {% endif %}
+{% endmacro %}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# PAGE HEADER                                                                 #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0">Upcoming Practice Sessions</h2>
-  {% if not current_user.is_authenticated %}
-  <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">
-    <i class="bi bi-person-plus"></i> Register to sign up
-  </a>
-  {% endif %}
+  <div class="d-flex gap-2 align-items-center">
+    {% if current_user.is_authenticated and current_user.is_admin %}
+    <a href="{{ url_for('admin.new_session') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg"></i> Add Session
+    </a>
+    {% elif not current_user.is_authenticated %}
+    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-person-plus"></i> Register to sign up
+    </a>
+    {% endif %}
+    {# View toggle #}
+    <div class="btn-group" role="group" aria-label="View toggle">
+      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+         class="btn {{ 'btn-primary' if view == 'calendar' else 'btn-outline-primary' }}">
+        <i class="bi bi-calendar3 me-1"></i>Calendar
+      </a>
+      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='list', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+         class="btn {{ 'btn-primary' if view == 'list' else 'btn-outline-primary' }}">
+        <i class="bi bi-list-ul me-1"></i>List
+      </a>
+      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='cards', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+         class="btn {{ 'btn-primary' if view == 'cards' else 'btn-outline-primary' }}">
+        <i class="bi bi-grid-3x2-gap me-1"></i>Cards
+      </a>
+    </div>
+  </div>
 </div>
 
-{# Fleet filter tabs #}
-<div class="mb-4">
-  <a href="{{ url_for('main.index') }}"
+{# ── Fleet filter ─────────────────────────────────────────────────────────── #}
+<div class="mb-2">
+  <a href="{{ url_for('main.index', view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
      class="btn btn-sm {{ 'btn-primary' if not selected_fleet else 'btn-outline-primary' }} me-1">
     All Fleets
   </a>
   {% for fleet in fleets %}
-  <a href="{{ url_for('main.index', fleet_id=fleet.id) }}"
+  <a href="{{ url_for('main.index', fleet_id=fleet.id, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
      class="btn btn-sm {{ 'btn-primary' if selected_fleet == fleet.id else 'btn-outline-primary' }} me-1">
     {{ fleet.name }}
   </a>
   {% endfor %}
 </div>
 
-{% if not sessions %}
+{# ── Sailor filter (parents only) ─────────────────────────────────────────── #}
+{% if is_parent and my_sailors_list %}
+<div class="mb-4 d-flex align-items-center gap-2 flex-wrap">
+  <span class="text-muted small fw-semibold">Sailor:</span>
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month) }}"
+     class="btn btn-sm rounded-pill {{ 'btn-dark' if not selected_sailor_id else 'btn-outline-secondary' }}">
+    All
+  </a>
+  {% for sailor in my_sailors_list %}
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=sailor.id, hide_empty=('1' if hide_empty else none)) }}"
+     class="btn btn-sm rounded-pill {{ 'btn-dark' if selected_sailor_id == sailor.id else 'btn-outline-secondary' }}">
+    {{ sailor.first_name }}
+    {% set has_signups = namespace(val=false) %}
+    {% for sess in sessions %}
+      {% if parent_signups.get(sess.id, {}).get(sailor.id) %}{% set has_signups.val = true %}{% endif %}
+    {% endfor %}
+    {% if has_signups.val %}<span class="ms-1 text-success">●</span>{% endif %}
+  </a>
+  {% endfor %}
+
+  {# Hide empty toggle — shown for all parents #}
+  {% if is_parent and my_sailors_list %}
+  <span class="vr mx-1"></span>
+  {% if hide_empty %}
+    <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id) }}"
+       class="btn btn-sm btn-warning">
+      <i class="bi bi-funnel-fill me-1"></i>Signed-up only — show all
+    </a>
+  {% else %}
+    <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty='1') }}"
+       class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-funnel me-1"></i>Show signed-up only
+    </a>
+  {% endif %}
+  {% endif %}
+</div>
+{% else %}
+<div class="mb-4"></div>
+{% endif %}
+
+{% if not sessions and view != 'calendar' %}
 <div class="alert alert-info">No upcoming sessions scheduled.</div>
+{# (list/cards with sessions handled below; calendar always shows grid) #}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# CALENDAR VIEW                                                               #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{% elif view == 'calendar' %}
+
+{% set month_names = ['','January','February','March','April','May','June',
+                      'July','August','September','October','November','December'] %}
+{% set day_names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+
+{# Month navigation header #}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=prev_year, cal_month=prev_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-chevron-left"></i>
+  </a>
+  <h4 class="mb-0">{{ month_names[cal_month] }} {{ cal_year }}</h4>
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=next_year, cal_month=next_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+     class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-chevron-right"></i>
+  </a>
+</div>
+
+{# Calendar grid #}
+<div class="table-responsive">
+  <table class="table table-bordered mb-0 lyc-calendar">
+    <thead class="table-light text-center">
+      <tr>
+        {% for d in day_names %}
+        <th class="fw-normal small py-1">{{ d }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in cal_weeks %}
+      <tr style="height:120px; vertical-align:top;">
+        {% for day_num in week %}
+        {% if day_num == 0 %}
+          <td class="bg-light"></td>
+        {% else %}
+          {% set cell_date_obj = today.__class__(cal_year, cal_month, day_num) %}
+          {% set is_today = cell_date_obj == today %}
+          {% set day_sessions = sessions_by_date.get(cell_date_obj, []) %}
+          <td class="p-1 {{ 'bg-light' if cell_date_obj < today else '' }}">
+            {# Day number #}
+            <div class="mb-1">
+              {% if is_today %}
+                <span class="badge rounded-pill bg-primary">{{ day_num }}</span>
+              {% else %}
+                <span class="small {{ 'text-muted' if cell_date_obj < today else 'fw-semibold' }}">{{ day_num }}</span>
+              {% endif %}
+            </div>
+            {# Session chips #}
+            {% for sess in day_sessions %}
+              {% set sess_signups = parent_signups.get(sess.id, {}) %}
+
+              {# Determine signup status for the filter context #}
+              {% if selected_sailor.obj %}
+                {% set focal_signup = sess_signups.get(selected_sailor.obj.id) %}
+              {% else %}
+                {# No filter: check if ANY sailor is signed up #}
+                {% set focal_signup = namespace(type=none) %}
+                {% set has_commitment = namespace(val=false) %}
+                {% set has_interest = namespace(val=false) %}
+                {% for sid, su in sess_signups.items() %}
+                  {% if su.signup_type == 'commitment' %}{% set has_commitment.val = true %}{% endif %}
+                  {% if su.signup_type == 'interest' %}{% set has_interest.val = true %}{% endif %}
+                {% endfor %}
+              {% endif %}
+
+              {# Border color: green=committed, yellow=interested, none=default #}
+              {% if selected_sailor.obj %}
+                {% if focal_signup and focal_signup.signup_type == 'commitment' %}
+                  {% set chip_border = '2px solid #198754' %}
+                {% elif focal_signup and focal_signup.signup_type == 'interest' %}
+                  {% set chip_border = '2px solid #ffc107' %}
+                {% else %}
+                  {% set chip_border = '1px solid rgba(0,0,0,.15)' %}
+                {% endif %}
+              {% else %}
+                {% if has_commitment.val %}
+                  {% set chip_border = '2px solid #198754' %}
+                {% elif has_interest.val %}
+                  {% set chip_border = '2px solid #ffc107' %}
+                {% else %}
+                  {% set chip_border = '1px solid rgba(0,0,0,.15)' %}
+                {% endif %}
+              {% endif %}
+
+              <a href="{{ url_for('main.session_detail', session_id=sess.id) }}"
+                 class="d-block text-decoration-none mb-1"
+                 title="{{ sess.fleet.name }} — {{ 'Full Day' if sess.session_type == 'full_day' else sess.session_type | capitalize }}{% if sess.status == 'cancelled' %} (Cancelled){% endif %}">
+                <div class="rounded px-1 pt-1 pb-1 small {{ 'opacity-50' if sess.status == 'cancelled' else '' }}"
+                  style="background-color:{{ sess.fleet.color or '#f8f9fa' }}; border:{{ chip_border }}; line-height:1.5;">
+
+                  {# Header row: emoji + fleet name + session/cancel badge #}
+                  <div class="d-flex align-items-center justify-content-between gap-1">
+                    <span class="fw-semibold text-dark text-truncate" style="font-size:.72rem;">
+                      {% if sess.session_type == 'morning' %}🌅
+                      {% elif sess.session_type == 'afternoon' %}☀️
+                      {% else %}📅{% endif %}
+                      {{ sess.fleet.name }}
+                    </span>
+                    {% if sess.status == 'confirmed' %}
+                      <span class="badge bg-success flex-shrink-0" style="font-size:.58rem;">✓</span>
+                    {% elif sess.status == 'cancelled' %}
+                      <span class="badge bg-secondary flex-shrink-0" style="font-size:.58rem;">✕</span>
+                    {% endif %}
+                  </div>
+
+                  {# Time #}
+                  {% if sess.start_time %}
+                    <div class="text-muted" style="font-size:.67rem;">{{ sess.start_time }}{% if sess.end_time %}–{{ sess.end_time }}{% endif %}</div>
+                  {% endif %}
+
+                  {# Committed / interested totals #}
+                  {% if sess.status != 'cancelled' %}
+                  <div class="d-flex gap-1 mt-1 flex-wrap">
+                    <span class="badge {{ 'bg-success' if sess.status == 'confirmed' else 'bg-primary' }}" style="font-size:.62rem;">
+                      <i class="bi bi-check-circle-fill"></i> {{ sess.commitment_count }}/{{ sess.min_sailors }}
+                    </span>
+                    {% if sess.interest_count %}
+                    <span class="badge bg-warning text-dark" style="font-size:.62rem;">
+                      <i class="bi bi-star-fill"></i> {{ sess.interest_count }}
+                    </span>
+                    {% endif %}
+                  </div>
+                  {% endif %}
+
+                  {# Signup status rows — one per sailor #}
+                  {% if is_parent %}
+                    {% if selected_sailor.obj %}
+                      {# Single sailor selected #}
+                      {% if focal_signup %}
+                        {% if focal_signup.signup_type == 'commitment' %}
+                          <div class="mt-1 rounded px-1" style="background:rgba(25,135,84,.15); font-size:.67rem; color:#0a3622;">
+                            <i class="bi bi-check-circle-fill text-success"></i> {{ selected_sailor.obj.first_name }}: Committed
+                          </div>
+                        {% else %}
+                          <div class="mt-1 rounded px-1" style="background:rgba(255,193,7,.2); font-size:.67rem; color:#664d03;">
+                            <i class="bi bi-star-fill text-warning"></i> {{ selected_sailor.obj.first_name }}: Interested
+                          </div>
+                        {% endif %}
+                      {% endif %}
+                    {% else %}
+                      {# All sailors — show each one that has a signup #}
+                      {% for sailor in my_sailors_list %}
+                        {% set su = sess_signups.get(sailor.id) %}
+                        {% if su %}
+                          {% if su.signup_type == 'commitment' %}
+                            <div class="mt-1 rounded px-1" style="background:rgba(25,135,84,.15); font-size:.67rem; color:#0a3622;">
+                              <i class="bi bi-check-circle-fill text-success"></i> {{ sailor.first_name }}
+                            </div>
+                          {% else %}
+                            <div class="mt-1 rounded px-1" style="background:rgba(255,193,7,.2); font-size:.67rem; color:#664d03;">
+                              <i class="bi bi-star-fill text-warning"></i> {{ sailor.first_name }}
+                            </div>
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+                    {% endif %}
+                  {% endif %}
+
+                </div>
+              </a>
+            {% endfor %}
+          </td>
+        {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not sessions %}
+<div class="alert alert-info mt-3 mb-0">No sessions scheduled for this month.</div>
+{% endif %}
+
+{# Legend #}
+<div class="mt-3 d-flex flex-wrap gap-3 small text-muted">
+  <span><span class="badge rounded-pill bg-primary">15</span> Today</span>
+  <span><span class="badge bg-success">✓</span> Confirmed &nbsp; <span class="badge bg-secondary">✕</span> Cancelled</span>
+  {% if is_parent %}
+  <span style="border-left:3px solid #198754; padding-left:4px;">Committed</span>
+  <span style="border-left:3px solid #ffc107; padding-left:4px;">Interested</span>
+  {% endif %}
+  <span>🌅 Morning &nbsp; ☀️ Afternoon</span>
+</div>
+
+<style>
+.lyc-calendar td { min-width: 90px; }
+.lyc-calendar th { min-width: 90px; }
+</style>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# LIST VIEW                                                                   #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{% elif view == 'list' %}
+
+{% set next_url = url_for('main.index', fleet_id=selected_fleet, view='list', sailor_id=selected_sailor_id) %}
+
+<div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Fleet</th>
+        <th>Time</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th style="min-width:160px">Progress</th>
+        <th>Deadline</th>
+        {% if is_parent %}
+          {% if selected_sailor.obj %}
+            {# Single sailor: one wide status+action column #}
+            <th class="text-center" style="min-width:180px;">
+              {{ selected_sailor.obj.first_name }}
+            </th>
+          {% else %}
+            {# All sailors: one column each #}
+            {% for sailor in my_sailors_list %}
+            <th class="text-center">{{ sailor.first_name }}</th>
+            {% endfor %}
+          {% endif %}
+        {% endif %}
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sess in sessions %}
+      {% set deadline_passed = sess.is_past_deadline %}
+      {% set committed_pct = [sess.commitment_count / sess.min_sailors * 100, 100] | min %}
+      {% set interest_pct  = [sess.interest_count  / sess.min_sailors * 100, 100 - committed_pct] | min %}
+      {% set sess_signups  = parent_signups.get(sess.id, {}) %}
+
+      {# Row highlight when a sailor filter is active and they're signed up #}
+      {% set row_class = '' %}
+      {% if sess.status == 'cancelled' %}
+        {% set row_class = 'table-secondary text-muted' %}
+      {% elif selected_sailor.obj and sess_signups.get(selected_sailor.obj.id) %}
+        {% set focal = sess_signups.get(selected_sailor.obj.id) %}
+        {% if focal.signup_type == 'commitment' %}
+          {% set row_class = 'table-success' %}
+        {% else %}
+          {% set row_class = 'table-warning' %}
+        {% endif %}
+      {% endif %}
+
+      <tr class="{{ row_class }}">
+        <td class="fw-semibold text-nowrap">{{ sess.date.strftime('%a, %b %#d') }}</td>
+
+        <td>
+          <span class="badge border" style="background-color:{{ sess.fleet.color or '#fff' }}; color:#333;">
+            {{ sess.fleet.name }}
+          </span>
+        </td>
+
+        <td class="text-nowrap small text-muted">
+          {% if sess.start_time %}{{ sess.start_time }}{% if sess.end_time %}–{{ sess.end_time }}{% endif %}{% else %}—{% endif %}
+        </td>
+
+        <td>
+          {% if sess.session_type == 'morning' %}
+            <span class="badge bg-warning text-dark">Morning</span>
+          {% elif sess.session_type == 'afternoon' %}
+            <span class="badge bg-info text-dark">Afternoon</span>
+          {% else %}
+            <span class="badge bg-secondary">Full Day</span>
+          {% endif %}
+        </td>
+
+        <td>
+          {% if sess.status == 'confirmed' %}
+            <span class="badge bg-success">Confirmed</span>
+          {% elif sess.status == 'cancelled' %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% else %}
+            <span class="badge bg-light text-dark border">Pending</span>
+          {% endif %}
+        </td>
+
+        <td style="min-width:160px">
+          <div class="d-flex justify-content-between small mb-1">
+            <span>{{ sess.commitment_count }}/{{ sess.min_sailors }}</span>
+            <span class="text-muted">+{{ sess.interest_count }}</span>
+          </div>
+          <div class="progress" style="height:8px">
+            <div class="progress-bar {{ 'bg-success' if sess.status == 'confirmed' else 'bg-primary' }}"
+                 style="width:{{ committed_pct }}%"></div>
+            <div class="progress-bar bg-warning"
+                 style="width:{{ interest_pct }}%"></div>
+          </div>
+        </td>
+
+        <td class="small text-nowrap {{ 'text-danger' if deadline_passed else 'text-muted' }}">
+          {{ sess.commitment_deadline.strftime('%b %#d') }}
+          {% if deadline_passed %}<br><span class="badge bg-danger">Closed</span>{% endif %}
+        </td>
+
+        {% if is_parent %}
+          {% if selected_sailor.obj %}
+            {# Single sailor column: status badge + action buttons side by side #}
+            <td class="text-center">
+              {% if selected_sailor.obj.fleet_id != sess.fleet_id %}
+                <a href="{{ url_for('main.session_detail', session_id=sess.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Different fleet — click to sign up">
+                  <i class="bi bi-arrow-right-circle"></i> Other fleet
+                </a>
+              {% else %}
+                {% set signup = sess_signups.get(selected_sailor.obj.id) %}
+                <div class="d-flex align-items-center justify-content-center gap-2">
+                  {{ status_badge(signup) }}
+                  {{ signup_btns(sess, selected_sailor.obj, signup, next_url) }}
+                </div>
+              {% endif %}
+            </td>
+          {% else %}
+            {# All sailors: one column each #}
+            {% for sailor in my_sailors_list %}
+            <td class="text-center">
+              {% if sailor.fleet_id != sess.fleet_id %}
+                <a href="{{ url_for('main.session_detail', session_id=sess.id) }}"
+                   class="btn btn-sm btn-outline-secondary" title="Different fleet">
+                  <i class="bi bi-arrow-right-circle"></i>
+                </a>
+              {% else %}
+                {% set signup = sess_signups.get(sailor.id) %}
+                {{ signup_btns(sess, sailor, signup, next_url) }}
+              {% endif %}
+            </td>
+            {% endfor %}
+          {% endif %}
+        {% endif %}
+
+        <td>
+          <a href="{{ url_for('main.session_detail', session_id=sess.id) }}"
+             class="btn btn-sm btn-outline-primary" title="View details">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_parent %}
+<div class="mt-2 text-muted small">
+  <span class="badge bg-success">&nbsp;</span> Committed row &nbsp;
+  <span class="badge bg-warning text-dark">&nbsp;</span> Interested row &nbsp;
+  <i class="bi bi-star-fill text-warning"></i> / <i class="bi bi-check-circle-fill text-success"></i> Toggle status &nbsp;
+  <i class="bi bi-arrow-right-circle text-secondary"></i> Different fleet
+</div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# CARD VIEW                                                                   #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
 {% else %}
 <div class="row g-3">
-  {% for s in sessions %}
-  {% set deadline_passed = s.is_past_deadline %}
+  {% for sess in sessions %}
+  {% set deadline_passed = sess.is_past_deadline %}
+  {% set committed_pct = [sess.commitment_count / sess.min_sailors * 100, 100] | min %}
+  {% set interest_pct  = [sess.interest_count  / sess.min_sailors * 100, 100 - committed_pct] | min %}
+  {% set sess_signups  = parent_signups.get(sess.id, {}) %}
+
+  {# Card border accent for selected sailor #}
+  {% set card_accent = '' %}
+  {% if selected_sailor.obj %}
+    {% set focal = sess_signups.get(selected_sailor.obj.id) %}
+    {% if focal and focal.signup_type == 'commitment' %}
+      {% set card_accent = 'border-success border-2' %}
+    {% elif focal and focal.signup_type == 'interest' %}
+      {% set card_accent = 'border-warning border-2' %}
+    {% endif %}
+  {% endif %}
+
   <div class="col-md-6 col-lg-4">
-    <div class="card card-session h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-bold">{{ s.fleet.name }}</span>
-        {% if s.status == 'confirmed' %}
-          <span class="badge bg-success">Confirmed</span>
-        {% elif s.status == 'cancelled' %}
-          <span class="badge bg-secondary">Cancelled</span>
-        {% else %}
-          <span class="badge bg-warning text-dark">Pending</span>
-        {% endif %}
+    <div class="card card-session h-100 {{ card_accent }}">
+      <div class="card-header d-flex justify-content-between align-items-center"
+           style="background-color: {{ sess.fleet.color or '#ffffff' }};">
+        <span class="fw-bold">{{ sess.fleet.name }}</span>
+        <div class="d-flex gap-1">
+          {% if sess.session_type == 'morning' %}
+            <span class="badge bg-warning text-dark">Morning</span>
+          {% elif sess.session_type == 'afternoon' %}
+            <span class="badge bg-info text-dark">Afternoon</span>
+          {% else %}
+            <span class="badge bg-secondary">Full Day</span>
+          {% endif %}
+          {% if sess.status == 'confirmed' %}
+            <span class="badge bg-success">Confirmed</span>
+          {% elif sess.status == 'cancelled' %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% else %}
+            <span class="badge bg-light text-dark border">Pending</span>
+          {% endif %}
+        </div>
       </div>
       <div class="card-body">
         <h5 class="card-title mb-1">
           <i class="bi bi-calendar3"></i>
-          {{ s.date.strftime('%A, %B %-d, %Y') }}
+          {{ sess.date.strftime('%A, %B %#d, %Y') }}
         </h5>
-        {% if s.start_time %}
+        {% if sess.start_time %}
         <p class="text-muted mb-2">
           <i class="bi bi-clock"></i>
-          {{ s.start_time }}{% if s.end_time %} – {{ s.end_time }}{% endif %}
+          {{ sess.start_time }}{% if sess.end_time %} – {{ sess.end_time }}{% endif %}
         </p>
         {% endif %}
 
-        {# Commitment progress #}
         <div class="mb-2">
           <div class="d-flex justify-content-between small mb-1">
-            <span>{{ s.commitment_count }} / {{ s.min_sailors }} committed</span>
-            <span class="text-muted">{{ s.interest_count }} interested</span>
+            <span>{{ sess.commitment_count }} / {{ sess.min_sailors }} committed</span>
+            <span class="text-muted">{{ sess.interest_count }} interested</span>
           </div>
           <div class="progress">
-            <div class="progress-bar {{ 'bg-success' if s.status == 'confirmed' else 'bg-primary' }}"
-                 style="width: {{ [s.commitment_count / s.min_sailors * 100, 100]|min }}%"></div>
+            <div class="progress-bar {{ 'bg-success' if sess.status == 'confirmed' else 'bg-primary' }}"
+                 style="width: {{ committed_pct }}%"></div>
+            <div class="progress-bar bg-warning"
+                 style="width: {{ interest_pct }}%"></div>
           </div>
         </div>
 
         <p class="small text-muted mb-0">
           <i class="bi bi-hourglass-split"></i>
-          Deadline: {{ s.commitment_deadline.strftime('%b %-d') }}
+          Deadline: {{ sess.commitment_deadline.strftime('%b %#d') }}
           {% if deadline_passed %}<span class="text-danger">(passed)</span>{% endif %}
         </p>
-
-        {% if s.notes %}
-        <p class="small mt-2 mb-0 text-muted">{{ s.notes }}</p>
+        {% if sess.notes %}
+        <p class="small mt-2 mb-0 text-muted">{{ sess.notes }}</p>
         {% endif %}
 
-        {# Show parent's sailors' signup status #}
-        {% if current_user.is_authenticated and not current_user.is_admin %}
-          {% set session_signups = parent_signups.get(s.id, {}) %}
-          {% set my_fleet_sailors = current_user.sailors | selectattr('fleet_id', 'equalto', s.fleet_id) | list %}
-          {% if my_fleet_sailors %}
+        {# Sailor signup status #}
+        {% if is_parent %}
+          {% set sailors_to_show = [selected_sailor.obj] if selected_sailor.obj else
+             (current_user.sailors | selectattr('fleet_id', 'equalto', sess.fleet_id) | list) %}
+          {% if sailors_to_show and sailors_to_show[0] is not none %}
           <div class="mt-2 border-top pt-2">
-            {% for sailor in my_fleet_sailors %}
-              {% set signup = session_signups.get(sailor.id) %}
-              <span class="badge {{ 'bg-success' if signup and signup.signup_type == 'commitment' else ('bg-info text-dark' if signup else 'bg-light text-muted border') }} me-1">
-                {{ sailor.name }}: {{ signup.signup_type if signup else 'not signed up' }}
-              </span>
+            {% for sailor in sailors_to_show %}
+              {% if sailor %}
+                {% set signup = sess_signups.get(sailor.id) %}
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <span class="small fw-semibold">{{ sailor.first_name }}</span>
+                  {{ status_badge(signup) }}
+                </div>
+              {% endif %}
             {% endfor %}
           </div>
           {% endif %}
         {% endif %}
       </div>
       <div class="card-footer">
-        <a href="{{ url_for('main.session_detail', session_id=s.id) }}"
+        <a href="{{ url_for('main.session_detail', session_id=sess.id) }}"
            class="btn btn-sm btn-outline-primary w-100">
           View &amp; Sign Up
         </a>
@@ -104,4 +628,5 @@
   {% endfor %}
 </div>
 {% endif %}
+
 {% endblock %}

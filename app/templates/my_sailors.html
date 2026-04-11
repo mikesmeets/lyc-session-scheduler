@@ -2,67 +2,182 @@
 {% block title %}My Sailors — LYC Jr Sailing{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">My Sailors</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">My Sailors</h2>
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSailorModal">
+    <i class="bi bi-plus-lg"></i> Add Sailor
+  </button>
+</div>
 
-<div class="row g-4">
-  <div class="col-md-5">
-    <div class="card">
-      <div class="card-header fw-bold">Add a Sailor</div>
-      <div class="card-body">
-        <form method="POST" action="{{ url_for('main.add_sailor') }}">
+{% if current_user.sailors %}
+<div class="card">
+  <div class="card-header fw-bold">Registered Sailors</div>
+  <ul class="list-group list-group-flush">
+    {% for sailor in current_user.sailors %}
+    <li class="list-group-item">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <strong>{{ sailor.first_name }} {{ sailor.last_name }}</strong>
+          <span class="text-muted ms-2">{{ sailor.fleet.name }}</span>
+          {% if sailor.birthday %}
+          {% set age = ((today - sailor.birthday).days // 365) %}
+          <div class="small text-muted">Born: {{ sailor.birthday.strftime('%B %#d, %Y') }} &middot; Age {{ age }}</div>
+          {% endif %}
+
+          {# Waiver status #}
+          <div class="mt-2 d-flex gap-4">
+            <form method="POST" action="{{ url_for('main.submit_waiver', sailor_id=sailor.id) }}" class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox"
+                       id="waiver_submitted_{{ sailor.id }}"
+                       {{ 'checked' if sailor.waiver_submitted }}
+                       onchange="this.form.submit()">
+                <label class="form-check-label small" for="waiver_submitted_{{ sailor.id }}">
+                  Waiver completed
+                </label>
+              </div>
+            </form>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox"
+                     id="waiver_confirmed_{{ sailor.id }}"
+                     {{ 'checked' if sailor.waiver_confirmed }}
+                     disabled>
+              <label class="form-check-label small text-muted" for="waiver_confirmed_{{ sailor.id }}">
+                Club confirmed
+              </label>
+            </div>
+          </div>
+          {% if not sailor.waiver_confirmed %}
+            {% set fleet_link = waiver_links | selectattr('fleet_id', 'equalto', sailor.fleet_id) | first | default(None) %}
+            {% if fleet_link %}
+            <div class="mt-1 small">
+              <i class="bi bi-exclamation-circle text-warning"></i>
+              Waiver pending club review —
+              <a href="{{ fleet_link.url }}" target="_blank" rel="noopener">{{ fleet_link.name }}</a>
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('main.edit_sailor', sailor_id=sailor.id) }}"
+             class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-pencil"></i>
+          </a>
+          <form method="POST" action="{{ url_for('main.delete_sailor', sailor_id=sailor.id) }}"
+                onsubmit="return confirm('Remove {{ sailor.first_name }}?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="alert alert-info">
+  You haven't added any sailors yet. Click <strong>Add Sailor</strong> to get started.
+</div>
+{% endif %}
+
+<div class="mt-3">
+  <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">
+    <i class="bi bi-calendar3"></i> View Schedule
+  </a>
+</div>
+
+{# ── Add Sailor Modal ─────────────────────────────────────────────────────── #}
+<div class="modal fade" id="addSailorModal" tabindex="-1" aria-labelledby="addSailorModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addSailorModalLabel">Add a Sailor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <form method="POST" action="{{ url_for('main.add_sailor') }}" id="addSailorForm">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <label class="form-label">First Name</label>
+              <input type="text" name="first_name" class="form-control" required>
+            </div>
+            <div class="col">
+              <label class="form-label">Last Name</label>
+              <input type="text" name="last_name" class="form-control" required>
+            </div>
+          </div>
           <div class="mb-3">
-            <label class="form-label">Sailor's Name</label>
-            <input type="text" name="name" class="form-control" placeholder="First Last" required>
+            <label class="form-label">Birthday</label>
+            <input type="date" name="birthday" class="form-control">
           </div>
           <div class="mb-3">
             <label class="form-label">Fleet</label>
-            <select name="fleet_id" class="form-select" required>
+            <select name="fleet_id" id="modalFleetSelect" class="form-select" required>
               <option value="">— Select fleet —</option>
               {% for fleet in fleets %}
               <option value="{{ fleet.id }}">{{ fleet.name }}</option>
               {% endfor %}
             </select>
           </div>
-          <button type="submit" class="btn btn-primary w-100">Add Sailor</button>
+
+          {# Waiver notice — shown dynamically after fleet is selected #}
+          <div id="waiverNotice" class="alert alert-info" style="display:none">
+            <strong><i class="bi bi-file-earmark-text me-1"></i>Waiver Required</strong>
+            <p class="mb-2 mt-1">Please fill out a waiver for your child on Clubspot before their first session:</p>
+            <ul id="waiverLinksList" class="mb-2"></ul>
+            <div class="form-check mt-1">
+              <input class="form-check-input" type="checkbox" name="waiver_submitted" id="modalWaiverCheck" value="1">
+              <label class="form-check-label small" for="modalWaiverCheck">
+                I have completed the waiver
+              </label>
+            </div>
+          </div>
         </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="addSailorForm" class="btn btn-primary">Add Sailor</button>
       </div>
     </div>
   </div>
-
-  <div class="col-md-7">
-    {% if current_user.sailors %}
-    <div class="card">
-      <div class="card-header fw-bold">Registered Sailors</div>
-      <ul class="list-group list-group-flush">
-        {% for sailor in current_user.sailors %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <strong>{{ sailor.name }}</strong>
-            <span class="text-muted ms-2">{{ sailor.fleet.name }}</span>
-          </div>
-          <form method="POST" action="{{ url_for('main.delete_sailor', sailor_id=sailor.id) }}"
-                onsubmit="return confirm('Remove {{ sailor.name }}?')">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-sm btn-outline-danger" type="submit">
-              <i class="bi bi-trash"></i>
-            </button>
-          </form>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% else %}
-    <div class="alert alert-info">
-      You haven't added any sailors yet. Add one to start signing up for sessions.
-    </div>
-    {% endif %}
-
-    <div class="mt-3">
-      <a href="{{ url_for('main.index') }}" class="btn btn-outline-primary">
-        <i class="bi bi-calendar3"></i> View Schedule
-      </a>
-    </div>
-  </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const linksByFleet = {};
+  {% for link in waiver_links %}
+  (linksByFleet[{{ link.fleet_id if link.fleet_id else 'null' }}] =
+    linksByFleet[{{ link.fleet_id if link.fleet_id else 'null' }}] || []).push({
+      name: {{ link.name | tojson }},
+      url: {{ link.url | tojson }}
+  });
+  {% endfor %}
+
+  document.getElementById('modalFleetSelect').addEventListener('change', function () {
+    const fleetId = parseInt(this.value) || null;
+    const notice = document.getElementById('waiverNotice');
+    const list   = document.getElementById('waiverLinksList');
+
+    const matches = [
+      ...(linksByFleet[fleetId] || []),
+      ...(linksByFleet[null]    || []),
+    ];
+
+    if (fleetId && matches.length) {
+      list.innerHTML = matches
+        .map(l => `<li><a href="${l.url}" target="_blank" rel="noopener">${l.name}</a></li>`)
+        .join('');
+      notice.style.display = 'block';
+    } else {
+      notice.style.display = 'none';
+    }
+  });
+</script>
 {% endblock %}

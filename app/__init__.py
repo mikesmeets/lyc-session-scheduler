@@ -1,10 +1,12 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
 db = SQLAlchemy()
+migrate = Migrate()
 login_manager = LoginManager()
 csrf = CSRFProtect()
 
@@ -18,6 +20,7 @@ def create_app():
     os.makedirs(app.instance_path, exist_ok=True)
 
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
 
@@ -41,22 +44,39 @@ def create_app():
 
 
 def _seed_data():
-    from .models import Fleet, User
+    from .models import Fleet, User, WaiverLink
     from werkzeug.security import generate_password_hash
 
     if not Fleet.query.first():
         db.session.add_all([
-            Fleet(name='Opti Green'),
-            Fleet(name='Opti RWB'),
+            Fleet(name='Opti Green', color='#d4edda'),
+            Fleet(name='Opti RWB',   color='#ffffff'),
+        ])
+        db.session.commit()
+
+    if not WaiverLink.query.first():
+        rwb   = Fleet.query.filter_by(name='Opti RWB').first()
+        green = Fleet.query.filter_by(name='Opti Green').first()
+        db.session.add_all([
+            WaiverLink(
+                name='Opti RWB Practice Day Waiver',
+                url='https://u9592777.ct.sendgrid.net/ls/click?upn=u001.rN7HdRPhtr3-2BA1M4XFagRW5S2zatLVRBsi-2Bo-2FB5T-2FYhTIPFm6rxUwBibJ2hwk6wLCJ4wHEDMJgZpsehFtyeghIoejid-2FKQ6QBI2mhQ6clwPEP26o2xkU9cHsEiK3pkiUr7jbfpCnwv3IKk379QRzzg-3D-3DHuY8_-2FDV5ntRJeKyGvTDMfRqIFSGmEFfmi7ze8U70ZKQUlgqdByPQOoV-2Fe4pPi1pSdr-2FGNwF-2BNI81xgBkI8mehEmHOCSSK2qctOy0g7tnePJsAnsxqv0jmSaBnHUph5H9pqhq9x0nQ3Kx0dEpQRKiH99dQNOWgXEdTKS5NsJyBKO2L2lx0s011uQ8af1X4oBPqfa07ThAWB9mJaxAnPTrCA7sJA-3D-3D',
+                fleet_id=rwb.id if rwb else None, sort_order=0,
+            ),
+            WaiverLink(
+                name='Opti Green Fleet Clinics',
+                url='https://u9592777.ct.sendgrid.net/ls/click?upn=u001.rN7HdRPhtr3-2BA1M4XFagRW5S2zatLVRBsi-2Bo-2FB5T-2FYhTIPFm6rxUwBibJ2hwk6wLCJ4wHEDMJgZpsehFtyeghIoejid-2FKQ6QBI2mhQ6clwMGLyFxhCBc7P91QC22aBcZ3m1Fw2f4wlM60S1vn-2B2SOA-3D-3D2tiw_-2FDV5ntRJeKyGvTDMfRqIFSGmEFfmi7ze8U70ZKQUlgqdByPQOoV-2Fe4pPi1pSdr-2FGNwF-2BNI81xgBkI8mehEmHOG1RcHOkTcpVIjA9AaCPXJDZyLHr-2FenLHGIGo84N1fgQ-2BxZzcQkMuTGN45jeVWDBSnA1DtMDIOcQCUPLrFXRfXbiJvvCu-2Fz84QpgkhSChRZqoR-2F5YWDPn3sfBp1fSbMBJg-3D-3D',
+                fleet_id=green.id if green else None, sort_order=1,
+            ),
         ])
         db.session.commit()
 
     if not User.query.filter_by(is_admin=True).first():
-        admin_user = User(
+        db.session.add(User(
             email='admin@lycsailing.org',
-            name='Admin',
-            password_hash=generate_password_hash('changeme'),
+            first_name='Admin',
+            last_name='User',
+            password_hash=generate_password_hash('admin'),
             is_admin=True,
-        )
-        db.session.add(admin_user)
+        ))
         db.session.commit()

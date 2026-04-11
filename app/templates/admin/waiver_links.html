@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Waiver Links — Admin{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.sailors') }}" class="btn btn-sm btn-outline-secondary mb-3">
+  <i class="bi bi-arrow-left"></i> Back to Sailors
+</a>
+<h2 class="mb-4">Waiver Links</h2>
+
+<div class="row g-4">
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header fw-bold">Add Waiver Link</div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" name="name" class="form-control"
+                   placeholder="e.g. Opti Green Waiver" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">URL</label>
+            <input type="url" name="url" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Fleet <span class="text-muted small">(leave blank to show for all)</span></label>
+            <select name="fleet_id" class="form-select">
+              <option value="">— All fleets —</option>
+              {% for fleet in fleets %}
+              <option value="{{ fleet.id }}">{{ fleet.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sort Order <span class="text-muted small">(lower = first)</span></label>
+            <input type="number" name="sort_order" class="form-control" value="0">
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Add Link</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header fw-bold">Current Waiver Links</div>
+      {% if links %}
+      <ul class="list-group list-group-flush">
+        {% for link in links %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ link.name }}</strong>
+            <div class="small text-muted text-truncate" style="max-width:300px">{{ link.url }}</div>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="{{ link.url }}" target="_blank" rel="noopener"
+               class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+            <form method="POST" action="{{ url_for('admin.delete_waiver_link', link_id=link.id) }}"
+                  onsubmit="return confirm('Remove this link?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">No waiver links yet.</div>
+      {% endif %}
+    </div>
+    <p class="text-muted small mt-2">
+      These links appear in the "Add Sailor" modal shown to parents.
+    </p>
+  </div>
+</div>
+{% endblock %}

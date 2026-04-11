@@ -30,6 +30,7 @@
       <tr>
         <th>Date</th>
         <th>Fleet</th>
+        <th>Type</th>
         <th>Status</th>
         <th>Committed / Min</th>
         <th>Deadline</th>
@@ -39,20 +40,29 @@
     <tbody>
       {% for s in sessions %}
       <tr class="{{ 'table-secondary' if s.status == 'cancelled' else '' }}">
-        <td>{{ s.date.strftime('%b %-d, %Y') }}</td>
-        <td>{{ s.fleet.name }}</td>
+        <td>{{ s.date.strftime('%b %#d, %Y') }}</td>
+        <td style="background-color: {{ s.fleet.color or '#ffffff' }};">{{ s.fleet.name }}</td>
+        <td>
+          {% if s.session_type == 'morning' %}
+            <span class="badge bg-warning text-dark">Morning</span>
+          {% elif s.session_type == 'afternoon' %}
+            <span class="badge bg-info text-dark">Afternoon</span>
+          {% else %}
+            <span class="badge bg-secondary">Full Day</span>
+          {% endif %}
+        </td>
         <td>
           {% if s.status == 'confirmed' %}
             <span class="badge bg-success">Confirmed</span>
           {% elif s.status == 'cancelled' %}
             <span class="badge bg-secondary">Cancelled</span>
           {% else %}
-            <span class="badge bg-warning text-dark">Pending</span>
+            <span class="badge bg-light text-dark border">Pending</span>
           {% endif %}
         </td>
         <td>{{ s.commitment_count }} / {{ s.min_sailors }}</td>
         <td class="{{ 'text-danger' if s.date >= today and s.is_past_deadline else '' }}">
-          {{ s.commitment_deadline.strftime('%b %-d') }}
+          {{ s.commitment_deadline.strftime('%b %#d') }}
         </td>
         <td>
           <a href="{{ url_for('admin.session_detail', session_id=s.id) }}"

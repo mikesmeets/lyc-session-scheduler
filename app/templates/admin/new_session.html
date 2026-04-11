@@ -7,8 +7,25 @@
     <h2 class="mb-4">Create New Session</h2>
     <div class="card">
       <div class="card-body">
-        <form method="POST">
+        <form method="POST" id="sessionForm">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Session Type</label>
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="session_type" value="morning" id="type_morning" checked>
+                <label class="form-check-label" for="type_morning">Morning</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="session_type" value="afternoon" id="type_afternoon">
+                <label class="form-check-label" for="type_afternoon">Afternoon</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="session_type" value="full_day" id="type_full_day">
+                <label class="form-check-label" for="type_full_day">Full Day</label>
+              </div>
+            </div>
+          </div>
           <div class="mb-3">
             <label class="form-label">Fleet</label>
             <select name="fleet_id" class="form-select" required>
@@ -18,9 +35,9 @@
               {% endfor %}
             </select>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Date</label>
-            <input type="date" name="date" class="form-control" required>
+          <div class="mb-3" id="singleDateWrap">
+            <label class="form-label" id="singleDateLabel">Date</label>
+            <input type="date" name="date" class="form-control" id="singleDate" required>
           </div>
           <div class="row g-3 mb-3">
             <div class="col">
@@ -46,13 +63,75 @@
               <input type="number" name="min_sailors" class="form-control" value="5" min="1" required>
             </div>
           </div>
-          <div class="mb-3">
+          <div class="mb-4">
             <label class="form-label">Notes <span class="text-muted">(optional)</span></label>
             <textarea name="notes" class="form-control" rows="3"
                       placeholder="Location, special instructions, etc."></textarea>
           </div>
+
+          {# ── Create Multiple Sessions box ─────────────────────────────── #}
+          <div class="border rounded mb-4">
+            <button type="button" id="multiToggle"
+                    class="btn w-100 text-start d-flex justify-content-between align-items-center px-3 py-2 rounded"
+                    style="background:none; border:none;">
+              <span class="fw-semibold"><i class="bi bi-calendar-range me-2"></i>Create Multiple Sessions</span>
+              <i class="bi bi-chevron-down" id="multiChevron"></i>
+            </button>
+
+            <div id="multiPanel" style="display:none" class="border-top p-3">
+              <input type="hidden" name="recurring" id="recurringFlag" value="0">
+
+              {# Method selector #}
+              <div class="d-flex gap-3 mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="recurring_mode"
+                         value="interval" id="modeInterval" checked>
+                  <label class="form-check-label" for="modeInterval">By Interval</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="recurring_mode"
+                         value="dates" id="modeDates">
+                  <label class="form-check-label" for="modeDates">Pick Specific Dates</label>
+                </div>
+              </div>
+
+              {# ── By Interval ── #}
+              <div id="intervalPanel">
+                <div class="row g-3 mb-2">
+                  <div class="col-sm-5">
+                    <label class="form-label small">Repeat every</label>
+                    <select name="repeat_weeks" id="repeatWeeks" class="form-select form-select-sm">
+                      <option value="1">1 week</option>
+                      <option value="2">2 weeks</option>
+                      <option value="3">3 weeks</option>
+                      <option value="4">4 weeks</option>
+                    </select>
+                  </div>
+                  <div class="col-sm-4">
+                    <label class="form-label small">Number of sessions</label>
+                    <input type="number" name="num_occurrences" id="numOccurrences"
+                           class="form-control form-control-sm" value="4" min="2" max="52">
+                  </div>
+                </div>
+                <div id="intervalPreview" class="small text-muted"></div>
+              </div>
+
+              {# ── Pick Dates ── #}
+              <div id="calPanel" style="display:none">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="calPrev">&lsaquo;</button>
+                  <strong id="calTitle"></strong>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="calNext">&rsaquo;</button>
+                </div>
+                <div id="calGrid" class="cal-grid mb-3"></div>
+                <div id="selectedDatesList" class="small"></div>
+                <div id="selectedDatesContainer"></div>
+              </div>
+            </div>
+          </div>
+
           <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Create Session</button>
+            <button type="submit" class="btn btn-primary" id="submitBtn">Create Session</button>
             <a href="{{ url_for('admin.sessions') }}" class="btn btn-outline-secondary">Cancel</a>
           </div>
         </form>
@@ -60,4 +139,178 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .cal-day-header { text-align:center; font-size:.72rem; font-weight:600; color:#6c757d; padding:3px 0; }
+  .cal-day {
+    text-align:center; padding:5px 2px; border-radius:4px;
+    border:1px solid transparent; cursor:pointer; font-size:.85rem;
+  }
+  .cal-day:hover  { background:#e9ecef; }
+  .cal-day.selected { background:#0d6efd; color:#fff; }
+  .cal-day.today  { border-color:#0d6efd; font-weight:700; }
+  .cal-day.past   { color:#ccc; cursor:default; }
+</style>
+<script>
+  // ── Expand/collapse ──────────────────────────────────────────────────────
+  const multiToggle  = document.getElementById('multiToggle');
+  const multiPanel   = document.getElementById('multiPanel');
+  const multiChevron = document.getElementById('multiChevron');
+  const recurringFlag = document.getElementById('recurringFlag');
+  const singleDateWrap = document.getElementById('singleDateWrap');
+  const singleDate     = document.getElementById('singleDate');
+
+  function applyDateFieldState() {
+    const open = multiPanel.style.display !== 'none';
+    if (!open) {
+      singleDateWrap.style.display = 'block';
+      singleDate.required = true;
+      document.getElementById('singleDateLabel').textContent = 'Date';
+      return;
+    }
+    const mode = document.querySelector('input[name="recurring_mode"]:checked').value;
+    if (mode === 'interval') {
+      // Show as Start Date for interval mode
+      singleDateWrap.style.display = 'block';
+      singleDate.required = true;
+      document.getElementById('singleDateLabel').textContent = 'Start Date';
+    } else {
+      // Hide for calendar/dates mode
+      singleDateWrap.style.display = 'none';
+      singleDate.required = false;
+      document.getElementById('singleDateLabel').textContent = 'Date';
+    }
+  }
+
+  multiToggle.addEventListener('click', () => {
+    const open = multiPanel.style.display === 'none';
+    multiPanel.style.display = open ? 'block' : 'none';
+    multiChevron.className   = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+    recurringFlag.value      = open ? '1' : '0';
+    applyDateFieldState();
+    updateSubmitBtn();
+    if (open) { initCal(); updateIntervalPreview(); updateSelectedSummary(); }
+  });
+
+  // ── Mode switch ──────────────────────────────────────────────────────────
+  document.querySelectorAll('input[name="recurring_mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const isInterval = r.value === 'interval';
+      document.getElementById('intervalPanel').style.display = isInterval ? 'block' : 'none';
+      document.getElementById('calPanel').style.display      = isInterval ? 'none'  : 'block';
+      applyDateFieldState();
+      updateSubmitBtn();
+    });
+  });
+
+  // ── Interval preview ─────────────────────────────────────────────────────
+  function updateIntervalPreview() {
+    const startVal = singleDate.value ||
+      [...document.querySelectorAll('input[name="selected_dates"]')].map(i=>i.value).sort()[0];
+    // Use today as fallback when date is hidden
+    const base  = startVal ? new Date(startVal + 'T12:00:00') : new Date();
+    const weeks = parseInt(document.getElementById('repeatWeeks').value) || 1;
+    const count = parseInt(document.getElementById('numOccurrences').value) || 4;
+    const dates = [];
+    for (let i = 0; i < count; i++) {
+      const d = new Date(base);
+      d.setDate(d.getDate() + i * weeks * 7);
+      dates.push(d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}));
+    }
+    document.getElementById('intervalPreview').innerHTML =
+      '<strong>Sessions on:</strong> ' + dates.join(', ');
+    updateSubmitBtn();
+  }
+  document.getElementById('repeatWeeks').addEventListener('change', updateIntervalPreview);
+  document.getElementById('numOccurrences').addEventListener('input', updateIntervalPreview);
+  document.getElementById('singleDate').addEventListener('change', updateIntervalPreview);
+
+  // ── Calendar ─────────────────────────────────────────────────────────────
+  let calYear, calMonth;
+  const selectedDates = new Set();
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+
+  function initCal() {
+    if (calYear) return;
+    const now = new Date(); calYear = now.getFullYear(); calMonth = now.getMonth();
+    renderCal();
+  }
+
+  function renderCal() {
+    document.getElementById('calTitle').textContent = MONTHS[calMonth] + ' ' + calYear;
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(h => {
+      const d = document.createElement('div');
+      d.className = 'cal-day-header'; d.textContent = h; grid.appendChild(d);
+    });
+    const firstDow    = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const today       = new Date(); today.setHours(0,0,0,0);
+    for (let i = 0; i < firstDow; i++) {
+      const e = document.createElement('div'); grid.appendChild(e);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      const ds   = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+      const date = new Date(ds + 'T12:00:00');
+      const cell = document.createElement('div');
+      cell.className = 'cal-day'; cell.textContent = day; cell.dataset.date = ds;
+      if (date < today) { cell.classList.add('past'); }
+      else {
+        if (selectedDates.has(ds)) cell.classList.add('selected');
+        if (date.toDateString() === today.toDateString()) cell.classList.add('today');
+        cell.addEventListener('click', () => {
+          selectedDates[selectedDates.has(ds) ? 'delete' : 'add'](ds);
+          cell.classList.toggle('selected');
+          updateSelectedSummary();
+        });
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  document.getElementById('calPrev').addEventListener('click', () => {
+    calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCal();
+  });
+  document.getElementById('calNext').addEventListener('click', () => {
+    calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCal();
+  });
+
+  function updateSelectedSummary() {
+    const sorted = [...selectedDates].sort();
+    const container = document.getElementById('selectedDatesContainer');
+    container.querySelectorAll('input[name="selected_dates"]').forEach(i => i.remove());
+    document.getElementById('selectedDatesList').innerHTML = sorted.length
+      ? '<span class="fw-semibold me-1">' + sorted.length + ' selected:</span>'
+        + sorted.map(ds => {
+            const d = new Date(ds + 'T12:00:00');
+            return `<span class="badge bg-primary me-1">${d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</span>`;
+          }).join('')
+      : '<span class="text-muted">No dates selected.</span>';
+    sorted.forEach(ds => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = 'selected_dates'; inp.value = ds;
+      container.appendChild(inp);
+    });
+    updateSubmitBtn();
+  }
+
+  // ── Submit button label ──────────────────────────────────────────────────
+  function updateSubmitBtn() {
+    const open = multiPanel.style.display !== 'none';
+    if (!open) { document.getElementById('submitBtn').textContent = 'Create Session'; return; }
+    const mode = document.querySelector('input[name="recurring_mode"]:checked').value;
+    if (mode === 'interval') {
+      const n = parseInt(document.getElementById('numOccurrences').value) || 4;
+      document.getElementById('submitBtn').textContent = `Create ${n} Sessions`;
+    } else {
+      const n = selectedDates.size;
+      document.getElementById('submitBtn').textContent = n > 0 ? `Create ${n} Sessions` : 'Create Session';
+    }
+  }
+</script>
 {% endblock %}

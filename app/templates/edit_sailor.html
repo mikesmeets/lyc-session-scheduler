@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Edit Sailor — LYC Jr Sailing{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <a href="{{ url_for('main.my_sailors') }}" class="btn btn-sm btn-outline-secondary mb-3">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold">Edit Sailor</div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <label class="form-label">First Name</label>
+              <input type="text" name="first_name" class="form-control"
+                     value="{{ sailor.first_name }}" required>
+            </div>
+            <div class="col">
+              <label class="form-label">Last Name</label>
+              <input type="text" name="last_name" class="form-control"
+                     value="{{ sailor.last_name }}" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Birthday</label>
+            <input type="date" name="birthday" class="form-control"
+                   value="{{ sailor.birthday.strftime('%Y-%m-%d') if sailor.birthday else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Fleet</label>
+            <select name="fleet_id" class="form-select" required>
+              {% for fleet in fleets %}
+              <option value="{{ fleet.id }}" {{ 'selected' if fleet.id == sailor.fleet_id }}>
+                {{ fleet.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Waiver Status</label>
+            <div class="d-flex gap-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" disabled
+                       {{ 'checked' if sailor.waiver_submitted }}>
+                <label class="form-check-label small">Waiver completed</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" disabled
+                       {{ 'checked' if sailor.waiver_confirmed }}>
+                <label class="form-check-label small text-muted">Club confirmed</label>
+              </div>
+            </div>
+            <div class="small text-muted mt-1">Manage waiver status from the My Sailors page.</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ url_for('main.my_sailors') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

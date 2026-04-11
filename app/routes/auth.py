@@ -28,12 +28,14 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
     if request.method == 'POST':
-        name = request.form.get('name', '').strip()
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        audit_number = request.form.get('audit_number', '').strip()
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
 
-        if not name or not email or not password:
+        if not first_name or not last_name or not audit_number or not email or not password:
             flash('All fields are required.', 'danger')
         elif password != confirm:
             flash('Passwords do not match.', 'danger')
@@ -41,14 +43,16 @@ def register():
             flash('An account with that email already exists.', 'danger')
         else:
             user = User(
-                name=name,
+                first_name=first_name,
+                last_name=last_name,
+                audit_number=audit_number,
                 email=email,
                 password_hash=generate_password_hash(password),
             )
             db.session.add(user)
             db.session.commit()
             login_user(user, remember=True)
-            flash(f'Welcome, {user.name}! Add your sailors to get started.', 'success')
+            flash(f'Welcome, {user.first_name}! Add your sailors to get started.', 'success')
             return redirect(url_for('main.my_sailors'))
     return render_template('auth/register.html')
 

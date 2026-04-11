@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Sailors — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">Sailors</h2>
+  <a href="{{ url_for('admin.waiver_links') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-link-45deg"></i> Manage Waiver Links
+  </a>
+</div>
+
+{# Fleet filter #}
+<div class="mb-3">
+  <a href="{{ url_for('admin.sailors') }}"
+     class="btn btn-sm {{ 'btn-secondary' if not selected_fleet else 'btn-outline-secondary' }} me-1">All</a>
+  {% for fleet in fleets %}
+  <a href="{{ url_for('admin.sailors', fleet_id=fleet.id) }}"
+     class="btn btn-sm {{ 'btn-secondary' if selected_fleet == fleet.id else 'btn-outline-secondary' }} me-1">
+    {{ fleet.name }}
+  </a>
+  {% endfor %}
+</div>
+
+{% if not sailors %}
+<div class="alert alert-info">No sailors registered yet.</div>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Name</th>
+        <th>Fleet</th>
+        <th>Birthday</th>
+        <th>Parent</th>
+        <th class="text-center">Waiver Completed</th>
+        <th class="text-center">Club Confirmed</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sailor in sailors %}
+      <tr>
+        <td><strong>{{ sailor.last_name }}, {{ sailor.first_name }}</strong></td>
+        <td>{{ sailor.fleet.name }}</td>
+        <td class="text-muted">
+          {{ sailor.birthday.strftime('%b %#d, %Y') if sailor.birthday else '—' }}
+        </td>
+        <td>{{ sailor.parent.name }}</td>
+        <td class="text-center">
+          {% if sailor.waiver_submitted %}
+            <span class="badge bg-success"><i class="bi bi-check-lg"></i> Yes</span>
+          {% else %}
+            <span class="badge bg-light text-muted border">No</span>
+          {% endif %}
+        </td>
+        <td class="text-center">
+          <form method="POST" action="{{ url_for('admin.toggle_waiver', sailor_id=sailor.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm {{ 'btn-success' if sailor.waiver_confirmed else 'btn-outline-secondary' }}"
+                    type="submit">
+              {% if sailor.waiver_confirmed %}
+                <i class="bi bi-check-lg"></i> Confirmed
+              {% else %}
+                Confirm
+              {% endif %}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
