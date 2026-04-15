@@ -91,15 +91,15 @@
     {% endif %}
     {# View toggle #}
     <div class="btn-group" role="group" aria-label="View toggle">
-      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
          class="btn {{ 'btn-primary' if view == 'calendar' else 'btn-outline-primary' }}">
         <i class="bi bi-calendar3 me-1"></i>Calendar
       </a>
-      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='list', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='list', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
          class="btn {{ 'btn-primary' if view == 'list' else 'btn-outline-primary' }}">
         <i class="bi bi-list-ul me-1"></i>List
       </a>
-      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='cards', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+      <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='cards', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
          class="btn {{ 'btn-primary' if view == 'cards' else 'btn-outline-primary' }}">
         <i class="bi bi-grid-3x2-gap me-1"></i>Cards
       </a>
@@ -107,14 +107,29 @@
   </div>
 </div>
 
+{# ── Confirmed-only filter ────────────────────────────────────────────────── #}
+<div class="mb-2 d-flex align-items-center gap-2">
+  {% if confirmed_only %}
+    <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+       class="btn btn-sm btn-success">
+      <i class="bi bi-check-circle-fill me-1"></i>Confirmed only — show all
+    </a>
+  {% else %}
+    <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only='1') }}"
+       class="btn btn-sm btn-outline-success">
+      <i class="bi bi-check-circle me-1"></i>Confirmed only
+    </a>
+  {% endif %}
+</div>
+
 {# ── Fleet filter ─────────────────────────────────────────────────────────── #}
 <div class="mb-2">
-  <a href="{{ url_for('main.index', view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+  <a href="{{ url_for('main.index', view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
      class="btn btn-sm {{ 'btn-primary' if not selected_fleet else 'btn-outline-primary' }} me-1">
     All Fleets
   </a>
   {% for fleet in fleets %}
-  <a href="{{ url_for('main.index', fleet_id=fleet.id, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+  <a href="{{ url_for('main.index', fleet_id=fleet.id, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
      class="btn btn-sm {{ 'btn-primary' if selected_fleet == fleet.id else 'btn-outline-primary' }} me-1">
     {{ fleet.name }}
   </a>
@@ -125,12 +140,12 @@
 {% if is_parent and my_sailors_list %}
 <div class="mb-4 d-flex align-items-center gap-2 flex-wrap">
   <span class="text-muted small fw-semibold">Sailor:</span>
-  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month) }}"
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, confirmed_only=('1' if confirmed_only else none)) }}"
      class="btn btn-sm rounded-pill {{ 'btn-dark' if not selected_sailor_id else 'btn-outline-secondary' }}">
     All
   </a>
   {% for sailor in my_sailors_list %}
-  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=sailor.id, hide_empty=('1' if hide_empty else none)) }}"
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=sailor.id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
      class="btn btn-sm rounded-pill {{ 'btn-dark' if selected_sailor_id == sailor.id else 'btn-outline-secondary' }}">
     {{ sailor.first_name }}
     {% set has_signups = namespace(val=false) %}
@@ -176,12 +191,12 @@
 
 {# Month navigation header #}
 <div class="d-flex align-items-center justify-content-between mb-3">
-  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=prev_year, cal_month=prev_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=prev_year, cal_month=prev_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
      class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-chevron-left"></i>
   </a>
   <h4 class="mb-0">{{ month_names[cal_month] }} {{ cal_year }}</h4>
-  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=next_year, cal_month=next_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none)) }}"
+  <a href="{{ url_for('main.index', fleet_id=selected_fleet, view='calendar', cal_year=next_year, cal_month=next_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
      class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-chevron-right"></i>
   </a>
@@ -364,7 +379,7 @@
 {# ══════════════════════════════════════════════════════════════════════════ #}
 {% elif view == 'list' %}
 
-{% set next_url = url_for('main.index', fleet_id=selected_fleet, view='list', sailor_id=selected_sailor_id) %}
+{% set next_url = url_for('main.index', fleet_id=selected_fleet, view='list', sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) %}
 
 <div class="table-responsive">
   <table class="table table-hover align-middle mb-0">

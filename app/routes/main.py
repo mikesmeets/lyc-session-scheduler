@@ -15,6 +15,7 @@ def index():
     view = request.args.get('view', 'calendar')  # 'cards', 'list', or 'calendar'
     selected_sailor_id = request.args.get('sailor_id', type=int)
     hide_empty = request.args.get('hide_empty') == '1'
+    confirmed_only = request.args.get('confirmed_only') == '1'
     today = date.today()
 
     # For calendar view, scope to the displayed month (may include past sessions)
@@ -70,6 +71,14 @@ def index():
             for signup in sailor.signups:
                 parent_signups.setdefault(signup.session_id, {})[sailor.id] = signup
 
+    # Filter to confirmed sessions only
+    if confirmed_only:
+        sessions = [s for s in sessions if s.status == 'confirmed']
+        if view == 'calendar':
+            sessions_by_date = {}
+            for s in sessions:
+                sessions_by_date.setdefault(s.date, []).append(s)
+
     # Filter to only sessions with relevant signups
     if hide_empty and current_user.is_authenticated and not current_user.is_admin:
         if selected_sailor_id:
@@ -92,6 +101,7 @@ def index():
         view=view,
         selected_sailor_id=selected_sailor_id,
         hide_empty=hide_empty,
+        confirmed_only=confirmed_only,
         # calendar-specific
         cal_year=cal_year,
         cal_month=cal_month,
