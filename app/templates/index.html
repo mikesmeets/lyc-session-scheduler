@@ -107,6 +107,20 @@
   </div>
 </div>
 
+{# ── Fleet filter ─────────────────────────────────────────────────────────── #}
+<div class="mb-2">
+  <a href="{{ url_for('main.index', view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
+     class="btn btn-sm {{ 'btn-primary' if not selected_fleet else 'btn-outline-primary' }} me-1">
+    All Fleets
+  </a>
+  {% for fleet in fleets %}
+  <a href="{{ url_for('main.index', fleet_id=fleet.id, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
+     class="btn btn-sm {{ 'btn-primary' if selected_fleet == fleet.id else 'btn-outline-primary' }} me-1">
+    {{ fleet.name }}
+  </a>
+  {% endfor %}
+</div>
+
 {# ── Confirmed-only filter ────────────────────────────────────────────────── #}
 <div class="mb-2 d-flex align-items-center gap-2">
   {% if confirmed_only %}
@@ -120,20 +134,6 @@
       <i class="bi bi-check-circle me-1"></i>Confirmed only
     </a>
   {% endif %}
-</div>
-
-{# ── Fleet filter ─────────────────────────────────────────────────────────── #}
-<div class="mb-2">
-  <a href="{{ url_for('main.index', view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
-     class="btn btn-sm {{ 'btn-primary' if not selected_fleet else 'btn-outline-primary' }} me-1">
-    All Fleets
-  </a>
-  {% for fleet in fleets %}
-  <a href="{{ url_for('main.index', fleet_id=fleet.id, view=view, cal_year=cal_year, cal_month=cal_month, sailor_id=selected_sailor_id, hide_empty=('1' if hide_empty else none), confirmed_only=('1' if confirmed_only else none)) }}"
-     class="btn btn-sm {{ 'btn-primary' if selected_fleet == fleet.id else 'btn-outline-primary' }} me-1">
-    {{ fleet.name }}
-  </a>
-  {% endfor %}
 </div>
 
 {# ── Sailor filter (parents only) ─────────────────────────────────────────── #}
