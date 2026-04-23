@@ -1,3 +1,6 @@
+import smtplib
+import ssl
+from email.mime.text import MIMEText
 from datetime import date, datetime, timedelta
 from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, request, flash
@@ -464,3 +467,79 @@ def settings():
 
     fleet_lock = AppSetting.get('fleet_lock', 'false') == 'true'
     return render_template('admin/settings.html', fleet_lock=fleet_lock)
+
+
+# ── Email Configuration ────────────────────────────────────────────────────────
+
+@admin_bp.route('/email-settings', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def email_settings():
+    if request.method == 'POST':
+        AppSetting.set('smtp_host',       request.form.get('smtp_host', '').strip())
+        AppSetting.set('smtp_port',       request.form.get('smtp_port', '587').strip())
+        AppSetting.set('smtp_encryption', request.form.get('smtp_encryption', 'tls'))
+        AppSetting.set('smtp_username',   request.form.get('smtp_username', '').strip())
+        # Only update password if a new one was entered
+        new_password = request.form.get('smtp_password', '').strip()
+        if new_password:
+            AppSetting.set('smtp_password', new_password)
+        AppSetting.set('smtp_from_name',  request.form.get('smtp_from_name', '').strip())
+        db.session.commit()
+        flash('Email settings saved.', 'success')
+        return redirect(url_for('admin.email_settings'))
+
+    config = {
+        'smtp_host':       AppSetting.get('smtp_host'),
+        'smtp_port':       AppSetting.get('smtp_port', '587'),
+        'smtp_encryption': AppSetting.get('smtp_encryption', 'tls'),
+        'smtp_username':   AppSetting.get('smtp_username'),
+        'smtp_from_name':  AppSetting.get('smtp_from_name', 'LYC Jr Sailing'),
+        'smtp_password_set': bool(AppSetting.get('smtp_password')),
+    }
+    return render_template('admin/email_settings.html', config=config)
+
+
+@admin_bp.route('/email-settings/test', methods=['POST'])
+@login_required
+@admin_required
+def test_email():
+    to_addr = request.form.get('test_to', '').strip()
+    if not to_addr:
+        flash('Please enter a recipient address.', 'danger')
+        return redirect(url_for('admin.email_settings'))
+
+    host       = AppSetting.get('smtp_host')
+    port       = int(AppSetting.get('smtp_port', '587') or 587)
+    encryption = AppSetting.get('smtp_encryption', 'tls')
+    username   = AppSetting.get('smtp_username')
+    password   = AppSetting.get('smtp_password')
+    from_name  = AppSetting.get('smtp_from_name', 'LYC Jr Sailing')
+    from_addr  = username
+
+    if not host or not username or not password:
+        flash('Email settings are incomplete. Please save your SMTP configuration first.', 'danger')
+        return redirect(url_for('admin.email_settings'))
+
+    msg = MIMEText('This is a test email from your LYC Jr Sailing app. SMTP is configured correctly!')
+    msg['Subject'] = 'LYC Jr Sailing — Test Email'
+    msg['From']    = f'{from_name} <{from_addr}>'
+    msg['To']      = to_addr
+
+    try:
+        if encryption == 'ssl':
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context) as server:
+                server.login(username, password)
+                server.sendmail(from_addr, to_addr, msg.as_string())
+        else:
+            with smtplib.SMTP(host, port) as server:
+                if encryption == 'tls':
+                    server.starttls(context=ssl.create_default_context())
+                server.login(username, password)
+                server.sendmail(from_addr, to_addr, msg.as_string())
+        flash(f'Test email sent to {to_addr}.', 'success')
+    except Exception as e:
+        flash(f'Failed to send email: {e}', 'danger')
+
+    return redirect(url_for('admin.email_settings'))
