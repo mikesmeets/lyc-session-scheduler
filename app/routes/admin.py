@@ -1,5 +1,6 @@
 import smtplib
 import ssl
+import socket
 from email.mime.text import MIMEText
 from datetime import date, datetime, timedelta
 from functools import wraps
@@ -500,46 +501,111 @@ def email_settings():
     return render_template('admin/email_settings.html', config=config)
 
 
+def _friendly_smtp_error(e):
+    """Convert raw SMTP/network exceptions into actionable messages."""
+    if isinstance(e, smtplib.SMTPAuthenticationError):
+        return ('Authentication failed',
+                'The username or password was rejected by the server. '
+                'Double-check your credentials and try again.')
+    if isinstance(e, smtplib.SMTPConnectError):
+        return ('Connection failed',
+                'Could not connect to the SMTP server. '
+                'Check that the host and port are correct and that the server is reachable.')
+    if isinstance(e, smtplib.SMTPServerDisconnected):
+        return ('Server disconnected',
+                'The server closed the connection unexpectedly. '
+                'This often means the wrong port or encryption type is selected.')
+    if isinstance(e, smtplib.SMTPSenderRefused):
+        return ('Sender refused',
+                f'The server rejected the From address ({e.sender}). '
+                'Make sure the username matches an authorised sending address.')
+    if isinstance(e, smtplib.SMTPRecipientsRefused):
+        return ('Recipient refused',
+                'The server rejected the recipient address. '
+                'Try a different test address.')
+    if isinstance(e, smtplib.SMTPException):
+        return ('SMTP error', str(e))
+    if isinstance(e, ssl.SSLError):
+        return ('SSL/TLS error',
+                'The SSL handshake failed. '
+                'Try switching between STARTTLS and SSL/TLS, or check that the port matches the encryption type.')
+    if isinstance(e, (socket.gaierror, socket.herror)):
+        return ('Host not found',
+                f'Could not resolve "{AppSetting.get("smtp_host")}". '
+                'Check that the SMTP host name is spelled correctly.')
+    if isinstance(e, (TimeoutError, socket.timeout)):
+        return ('Connection timed out',
+                'The server did not respond in time. '
+                'The host may be wrong, the port may be blocked, or the server may be down.')
+    if isinstance(e, ConnectionRefusedError):
+        return ('Connection refused',
+                f'Port {AppSetting.get("smtp_port")} was refused. '
+                'Check the port number and that the server allows connections from this host.')
+    return ('Unexpected error', str(e))
+
+
 @admin_bp.route('/email-settings/test', methods=['POST'])
 @login_required
 @admin_required
 def test_email():
     to_addr = request.form.get('test_to', '').strip()
-    if not to_addr:
-        flash('Please enter a recipient address.', 'danger')
-        return redirect(url_for('admin.email_settings'))
 
     host       = AppSetting.get('smtp_host')
-    port       = int(AppSetting.get('smtp_port', '587') or 587)
+    port_str   = AppSetting.get('smtp_port', '587')
     encryption = AppSetting.get('smtp_encryption', 'tls')
     username   = AppSetting.get('smtp_username')
     password   = AppSetting.get('smtp_password')
     from_name  = AppSetting.get('smtp_from_name', 'LYC Jr Sailing')
-    from_addr  = username
+
+    config = {
+        'smtp_host':       host,
+        'smtp_port':       port_str,
+        'smtp_encryption': encryption,
+        'smtp_username':   username,
+        'smtp_from_name':  from_name,
+        'smtp_password_set': bool(password),
+    }
+
+    def render_with_error(title, detail, test_to=''):
+        return render_template('admin/email_settings.html',
+                               config=config,
+                               test_error_title=title,
+                               test_error_detail=detail,
+                               test_to=test_to), 200
+
+    if not to_addr:
+        return render_with_error('Missing recipient', 'Please enter an email address to send the test to.')
 
     if not host or not username or not password:
-        flash('Email settings are incomplete. Please save your SMTP configuration first.', 'danger')
-        return redirect(url_for('admin.email_settings'))
+        missing = [f for f, v in [('Host', host), ('Username', username), ('Password', password)] if not v]
+        return render_with_error('Incomplete configuration',
+                                 f'The following fields are not set: {", ".join(missing)}. '
+                                 'Save your SMTP settings before sending a test.')
+
+    try:
+        port = int(port_str)
+    except (ValueError, TypeError):
+        return render_with_error('Invalid port', f'"{port_str}" is not a valid port number.', to_addr)
 
     msg = MIMEText('This is a test email from your LYC Jr Sailing app. SMTP is configured correctly!')
     msg['Subject'] = 'LYC Jr Sailing — Test Email'
-    msg['From']    = f'{from_name} <{from_addr}>'
+    msg['From']    = f'{from_name} <{username}>'
     msg['To']      = to_addr
 
     try:
         if encryption == 'ssl':
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context) as server:
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=ctx, timeout=10) as server:
                 server.login(username, password)
-                server.sendmail(from_addr, to_addr, msg.as_string())
+                server.sendmail(username, to_addr, msg.as_string())
         else:
-            with smtplib.SMTP(host, port) as server:
+            with smtplib.SMTP(host, port, timeout=10) as server:
                 if encryption == 'tls':
                     server.starttls(context=ssl.create_default_context())
                 server.login(username, password)
-                server.sendmail(from_addr, to_addr, msg.as_string())
-        flash(f'Test email sent to {to_addr}.', 'success')
+                server.sendmail(username, to_addr, msg.as_string())
+        flash(f'Test email sent successfully to {to_addr}.', 'success')
+        return redirect(url_for('admin.email_settings'))
     except Exception as e:
-        flash(f'Failed to send email: {e}', 'danger')
-
-    return redirect(url_for('admin.email_settings'))
+        title, detail = _friendly_smtp_error(e)
+        return render_with_error(title, detail, to_addr)

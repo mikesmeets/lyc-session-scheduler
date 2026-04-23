@@ -96,6 +96,13 @@
     <div class="card">
       <div class="card-header fw-bold">Send Test Email</div>
       <div class="card-body">
+        {% if test_error_title is defined %}
+        <div class="alert alert-danger mb-3">
+          <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ test_error_title }}</div>
+          <div class="small">{{ test_error_detail }}</div>
+        </div>
+        {% endif %}
+
         {% if config.smtp_host and config.smtp_username and config.smtp_password_set %}
         <p class="text-muted small mb-3">
           Sends a test message using your current saved settings.
@@ -105,6 +112,7 @@
           <div class="mb-3">
             <label class="form-label">Send to</label>
             <input type="email" name="test_to" class="form-control"
+                   value="{{ test_to if test_to is defined else '' }}"
                    placeholder="you@example.com" required>
           </div>
           <button type="submit" class="btn btn-outline-primary">
