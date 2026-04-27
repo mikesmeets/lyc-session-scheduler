@@ -360,6 +360,53 @@ def sailors():
     )
 
 
+@admin_bp.route('/sailors/new', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def new_sailor_admin():
+    fleets = Fleet.query.order_by(Fleet.name).all()
+    users  = User.query.filter_by(is_admin=False).order_by(User.last_name, User.first_name).all()
+
+    if request.method == 'POST':
+        first_name       = request.form.get('first_name', '').strip()
+        last_name        = request.form.get('last_name', '').strip()
+        fleet_id         = request.form.get('fleet_id', type=int)
+        parent_id        = request.form.get('parent_id', type=int)
+        birthday_str     = request.form.get('birthday', '').strip()
+        waiver_submitted = request.form.get('waiver_submitted') == '1'
+        waiver_confirmed = request.form.get('waiver_confirmed') == '1'
+
+        if not first_name or not last_name or not fleet_id or not parent_id:
+            flash('First name, last name, fleet, and parent are required.', 'danger')
+            return render_template('admin/new_sailor.html', fleets=fleets, users=users,
+                                   form=request.form)
+
+        birthday = None
+        if birthday_str:
+            try:
+                birthday = datetime.strptime(birthday_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid birthday format.', 'danger')
+                return render_template('admin/new_sailor.html', fleets=fleets, users=users,
+                                       form=request.form)
+
+        sailor = Sailor(
+            first_name       = first_name,
+            last_name        = last_name,
+            fleet_id         = fleet_id,
+            parent_id        = parent_id,
+            birthday         = birthday,
+            waiver_submitted = waiver_submitted,
+            waiver_confirmed = waiver_confirmed,
+        )
+        db.session.add(sailor)
+        db.session.commit()
+        flash(f'Created sailor {sailor.name}.', 'success')
+        return redirect(url_for('admin.sailors'))
+
+    return render_template('admin/new_sailor.html', fleets=fleets, users=users, form={})
+
+
 @admin_bp.route('/sailors/<int:sailor_id>/edit', methods=['GET', 'POST'])
 @login_required
 @admin_required

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}New Sailor — Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{{ url_for('admin.sailors') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h2 class="mb-0">New Sailor</h2>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">First Name</label>
+              <input type="text" name="first_name" class="form-control" required
+                     value="{{ form.get('first_name', '') }}">
+            </div>
+            <div class="col">
+              <label class="form-label">Last Name</label>
+              <input type="text" name="last_name" class="form-control" required
+                     value="{{ form.get('last_name', '') }}">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Fleet</label>
+            <select name="fleet_id" class="form-select" required>
+              <option value="">— select fleet —</option>
+              {% for fleet in fleets %}
+              <option value="{{ fleet.id }}"
+                {{ 'selected' if form.get('fleet_id')|int == fleet.id }}>
+                {{ fleet.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Parent Account</label>
+            <select name="parent_id" class="form-select" required>
+              <option value="">— select parent —</option>
+              {% for user in users %}
+              <option value="{{ user.id }}"
+                {{ 'selected' if form.get('parent_id')|int == user.id }}>
+                {{ user.name }} ({{ user.email }})
+              </option>
+              {% endfor %}
+            </select>
+            {% if not users %}
+            <div class="form-text text-warning">
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              No parent accounts exist yet.
+              <a href="{{ url_for('admin.new_user') }}">Create one first.</a>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Birthday <span class="text-muted small">(optional)</span></label>
+            <input type="date" name="birthday" class="form-control"
+                   value="{{ form.get('birthday', '') }}">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label d-block">Waiver</label>
+            <div class="d-flex gap-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="waiver_submitted"
+                       value="1" id="waiver_submitted"
+                       {{ 'checked' if form.get('waiver_submitted') }}>
+                <label class="form-check-label" for="waiver_submitted">Waiver completed (parent)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="waiver_confirmed"
+                       value="1" id="waiver_confirmed"
+                       {{ 'checked' if form.get('waiver_confirmed') }}>
+                <label class="form-check-label" for="waiver_confirmed">Club confirmed</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Create Sailor</button>
+            <a href="{{ url_for('admin.sailors') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -4,9 +4,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2 class="mb-0">Sailors</h2>
-  <a href="{{ url_for('admin.waiver_links') }}" class="btn btn-sm btn-outline-secondary">
-    <i class="bi bi-link-45deg"></i> Manage Waiver Links
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.new_sailor_admin') }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg"></i> New Sailor
+    </a>
+    <a href="{{ url_for('admin.waiver_links') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-link-45deg"></i> Manage Waiver Links
+    </a>
+  </div>
 </div>
 
 {# Fleet filter #}
