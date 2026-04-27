@@ -89,29 +89,29 @@ def forgot_password():
             return render_template('auth/forgot_password.html', email=email)
 
         # Invalidate any existing unused tokens for this user
-            PasswordResetToken.query.filter_by(user_id=user.id, used=False).delete()
+        PasswordResetToken.query.filter_by(user_id=user.id, used=False).delete()
 
-            token_value = secrets.token_urlsafe(32)
-            expires_at  = datetime.utcnow() + timedelta(hours=1)
-            token = PasswordResetToken(
-                user_id    = user.id,
-                token      = token_value,
-                expires_at = expires_at,
-            )
-            db.session.add(token)
-            db.session.commit()
+        token_value = secrets.token_urlsafe(32)
+        expires_at  = datetime.utcnow() + timedelta(hours=1)
+        token = PasswordResetToken(
+            user_id    = user.id,
+            token      = token_value,
+            expires_at = expires_at,
+        )
+        db.session.add(token)
+        db.session.commit()
 
-            reset_url = url_for('auth.reset_password', token=token_value, _external=True)
+        reset_url = url_for('auth.reset_password', token=token_value, _external=True)
 
-            body_text = (
-                f"Hi {user.first_name},\n\n"
-                "Someone requested a password reset for your LYC Jr Sailing account.\n\n"
-                "Click the link below to set a new password (valid for 1 hour):\n\n"
-                f"{reset_url}\n\n"
-                "If you didn't request this, you can safely ignore this email.\n\n"
-                "— LYC Jr Sailing"
-            )
-            body_html = f"""
+        body_text = (
+            f"Hi {user.first_name},\n\n"
+            "Someone requested a password reset for your LYC Jr Sailing account.\n\n"
+            "Click the link below to set a new password (valid for 1 hour):\n\n"
+            f"{reset_url}\n\n"
+            "If you didn't request this, you can safely ignore this email.\n\n"
+            "— LYC Jr Sailing"
+        )
+        body_html = f"""
 <p>Hi {user.first_name},</p>
 <p>Someone requested a password reset for your LYC Jr Sailing account.</p>
 <p>
@@ -131,14 +131,14 @@ def forgot_password():
 If you didn't request this, you can safely ignore this email.</small></p>
 <p>— LYC Jr Sailing</p>
 """
-            ok, err = send_email(
-                to_addr   = user.email,
-                subject   = 'LYC Jr Sailing — Reset Your Password',
-                body_text = body_text,
-                body_html = body_html,
-            )
-            if not ok:
-                log.error('Password reset email failed for %s: %s', user.email, err)
+        ok, err = send_email(
+            to_addr   = user.email,
+            subject   = 'LYC Jr Sailing — Reset Your Password',
+            body_text = body_text,
+            body_html = body_html,
+        )
+        if not ok:
+            log.error('Password reset email failed for %s: %s', user.email, err)
 
         flash(
             "If that email is registered you'll receive a reset link shortly. "
