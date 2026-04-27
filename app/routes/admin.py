@@ -306,6 +306,61 @@ def sailors():
     )
 
 
+@admin_bp.route('/sailors/<int:sailor_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_sailor_admin(sailor_id):
+    sailor = Sailor.query.get_or_404(sailor_id)
+    fleets = Fleet.query.order_by(Fleet.name).all()
+    users  = User.query.filter_by(is_admin=False).order_by(User.last_name, User.first_name).all()
+
+    if request.method == 'POST':
+        first_name   = request.form.get('first_name', '').strip()
+        last_name    = request.form.get('last_name', '').strip()
+        fleet_id     = request.form.get('fleet_id', type=int)
+        parent_id    = request.form.get('parent_id', type=int)
+        birthday_str = request.form.get('birthday', '').strip()
+        waiver_submitted = request.form.get('waiver_submitted') == '1'
+        waiver_confirmed = request.form.get('waiver_confirmed') == '1'
+
+        if not first_name or not last_name or not fleet_id or not parent_id:
+            flash('First name, last name, fleet, and parent are required.', 'danger')
+            return render_template('admin/edit_sailor.html', sailor=sailor, fleets=fleets, users=users)
+
+        birthday = None
+        if birthday_str:
+            try:
+                birthday = datetime.strptime(birthday_str, '%Y-%m-%d').date()
+            except ValueError:
+                flash('Invalid birthday format.', 'danger')
+                return render_template('admin/edit_sailor.html', sailor=sailor, fleets=fleets, users=users)
+
+        sailor.first_name       = first_name
+        sailor.last_name        = last_name
+        sailor.fleet_id         = fleet_id
+        sailor.parent_id        = parent_id
+        sailor.birthday         = birthday
+        sailor.waiver_submitted = waiver_submitted
+        sailor.waiver_confirmed = waiver_confirmed
+        db.session.commit()
+        flash(f'Updated {sailor.name}.', 'success')
+        return redirect(url_for('admin.sailors'))
+
+    return render_template('admin/edit_sailor.html', sailor=sailor, fleets=fleets, users=users)
+
+
+@admin_bp.route('/sailors/<int:sailor_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_sailor_admin(sailor_id):
+    sailor = Sailor.query.get_or_404(sailor_id)
+    name = sailor.name
+    db.session.delete(sailor)
+    db.session.commit()
+    flash(f'Deleted {name}.', 'success')
+    return redirect(url_for('admin.sailors'))
+
+
 @admin_bp.route('/sailors/<int:sailor_id>/toggle-waiver', methods=['POST'])
 @login_required
 @admin_required

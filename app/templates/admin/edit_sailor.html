@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Edit Sailor — Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{{ url_for('admin.sailors') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h2 class="mb-0">Edit Sailor</h2>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">First Name</label>
+              <input type="text" name="first_name" class="form-control" required
+                     value="{{ sailor.first_name }}">
+            </div>
+            <div class="col">
+              <label class="form-label">Last Name</label>
+              <input type="text" name="last_name" class="form-control" required
+                     value="{{ sailor.last_name }}">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Fleet</label>
+            <select name="fleet_id" class="form-select" required>
+              {% for fleet in fleets %}
+              <option value="{{ fleet.id }}" {{ 'selected' if fleet.id == sailor.fleet_id }}>
+                {{ fleet.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Parent</label>
+            <select name="parent_id" class="form-select" required>
+              {% for user in users %}
+              <option value="{{ user.id }}" {{ 'selected' if user.id == sailor.parent_id }}>
+                {{ user.name }} ({{ user.email }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Birthday</label>
+            <input type="date" name="birthday" class="form-control"
+                   value="{{ sailor.birthday.strftime('%Y-%m-%d') if sailor.birthday else '' }}">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label d-block">Waiver</label>
+            <div class="d-flex gap-4">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="waiver_submitted"
+                       value="1" id="waiver_submitted"
+                       {{ 'checked' if sailor.waiver_submitted }}>
+                <label class="form-check-label" for="waiver_submitted">Waiver completed (parent)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="waiver_confirmed"
+                       value="1" id="waiver_confirmed"
+                       {{ 'checked' if sailor.waiver_confirmed }}>
+                <label class="form-check-label" for="waiver_confirmed">Club confirmed</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="{{ url_for('admin.sailors') }}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mt-3 border-danger">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+          <div class="fw-semibold text-danger">Delete Sailor</div>
+          <div class="text-muted small">Removes {{ sailor.name }} and all their session signups.</div>
+        </div>
+        <form method="POST" action="{{ url_for('admin.delete_sailor_admin', sailor_id=sailor.id) }}"
+              onsubmit="return confirm('Delete {{ sailor.name }}? This will remove all their signups too.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger btn-sm" type="submit">
+            <i class="bi bi-trash"></i> Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
