@@ -220,7 +220,60 @@ def new_session():
 @admin_required
 def session_detail(session_id):
     session = Session.query.get_or_404(session_id)
-    return render_template('admin/session_detail.html', session=session, today=date.today())
+    # Sailors in the same fleet who aren't already signed up
+    signed_up_ids = {s.sailor_id for s in session.signups}
+    eligible = (Sailor.query
+                .filter_by(fleet_id=session.fleet_id)
+                .order_by(Sailor.last_name, Sailor.first_name)
+                .all())
+    available = [s for s in eligible if s.id not in signed_up_ids]
+    return render_template('admin/session_detail.html',
+                           session=session,
+                           today=date.today(),
+                           available_sailors=available)
+
+
+@admin_bp.route('/sessions/<int:session_id>/add-signup', methods=['POST'])
+@login_required
+@admin_required
+def admin_add_signup(session_id):
+    session = Session.query.get_or_404(session_id)
+    sailor_id   = request.form.get('sailor_id', type=int)
+    signup_type = request.form.get('signup_type', 'commitment')
+
+    if not sailor_id:
+        flash('Please select a sailor.', 'danger')
+        return redirect(url_for('admin.session_detail', session_id=session_id))
+
+    sailor = Sailor.query.get_or_404(sailor_id)
+
+    existing = Signup.query.filter_by(session_id=session_id, sailor_id=sailor_id).first()
+    if existing:
+        existing.signup_type = signup_type
+        flash(f'Updated {sailor.name} to {signup_type}.', 'success')
+    else:
+        db.session.add(Signup(session_id=session_id, sailor_id=sailor_id, signup_type=signup_type))
+        flash(f'Added {sailor.name} as {signup_type}.', 'success')
+
+    db.session.commit()
+    session.update_status()
+    db.session.commit()
+    return redirect(url_for('admin.session_detail', session_id=session_id))
+
+
+@admin_bp.route('/sessions/<int:session_id>/remove-signup/<int:sailor_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_remove_signup(session_id, sailor_id):
+    signup = Signup.query.filter_by(session_id=session_id, sailor_id=sailor_id).first_or_404()
+    sess        = signup.session
+    sailor_name = signup.sailor.name
+    db.session.delete(signup)
+    db.session.commit()
+    sess.update_status()
+    db.session.commit()
+    flash(f'Removed {sailor_name} from this session.', 'success')
+    return redirect(url_for('admin.session_detail', session_id=session_id))
 
 
 @admin_bp.route('/sessions/<int:session_id>/edit', methods=['GET', 'POST'])
