@@ -109,6 +109,15 @@ class WaiverLink(db.Model):
     sort_order = db.Column(db.Integer, default=0)
 
 
+class PasswordResetToken(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token      = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used       = db.Column(db.Boolean, default=False)
+    user       = db.relationship('User', backref='reset_tokens')
+
+
 class AppSetting(db.Model):
     key = db.Column(db.String(100), primary_key=True)
     value = db.Column(db.String(200), nullable=False, default='')
