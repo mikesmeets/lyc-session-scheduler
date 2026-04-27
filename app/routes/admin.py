@@ -220,17 +220,17 @@ def new_session():
 @admin_required
 def session_detail(session_id):
     session = Session.query.get_or_404(session_id)
-    # Sailors in the same fleet who aren't already signed up
     signed_up_ids = {s.sailor_id for s in session.signups}
-    eligible = (Sailor.query
-                .filter_by(fleet_id=session.fleet_id)
-                .order_by(Sailor.last_name, Sailor.first_name)
-                .all())
-    available = [s for s in eligible if s.id not in signed_up_ids]
+    all_sailors = (Sailor.query
+                   .order_by(Sailor.last_name, Sailor.first_name)
+                   .all())
+    same_fleet  = [s for s in all_sailors if s.fleet_id == session.fleet_id  and s.id not in signed_up_ids]
+    other_fleet = [s for s in all_sailors if s.fleet_id != session.fleet_id  and s.id not in signed_up_ids]
     return render_template('admin/session_detail.html',
                            session=session,
                            today=date.today(),
-                           available_sailors=available)
+                           available_sailors=same_fleet,
+                           other_fleet_sailors=other_fleet)
 
 
 @admin_bp.route('/sessions/<int:session_id>/add-signup', methods=['POST'])
