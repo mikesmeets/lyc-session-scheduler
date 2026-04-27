@@ -84,10 +84,11 @@ def forgot_password():
         email = request.form.get('email', '').strip().lower()
         user  = User.query.filter_by(email=email).first()
 
-        # Always show the same confirmation — don't leak whether an account
-        # exists for a given email address.
-        if user:
-            # Invalidate any existing unused tokens for this user
+        if not user:
+            flash('No account found with that email address.', 'danger')
+            return render_template('auth/forgot_password.html', email=email)
+
+        # Invalidate any existing unused tokens for this user
             PasswordResetToken.query.filter_by(user_id=user.id, used=False).delete()
 
             token_value = secrets.token_urlsafe(32)
