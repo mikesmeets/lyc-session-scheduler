@@ -11,9 +11,10 @@ def send_email(to_addr, subject, body_text, body_html=None):
     Returns (True, None) on success or (False, error_message) on failure.
     Reads SMTP settings fresh from the database on every call so that
     config changes take effect without restarting the app.
+    Every attempt (success or failure) is written to EmailLog.
     """
-    # Import here to avoid circular imports at module load time
-    from .models import AppSetting
+    from .models import AppSetting, EmailLog
+    from . import db
 
     host       = AppSetting.get('smtp_host')
     port_str   = AppSetting.get('smtp_port', '587')
@@ -22,14 +23,30 @@ def send_email(to_addr, subject, body_text, body_html=None):
     password   = AppSetting.get('smtp_password')
     from_name  = AppSetting.get('smtp_from_name', 'LYC Jr Sailing')
 
+    def _log(success, error_msg=None):
+        try:
+            db.session.add(EmailLog(
+                to_addr   = to_addr,
+                subject   = subject,
+                success   = success,
+                error_msg = error_msg,
+            ))
+            db.session.commit()
+        except Exception:
+            pass  # Never let logging break the calling code
+
     if not host or not username or not password:
         missing = [label for label, val in [('Host', host), ('Username', username), ('Password', password)] if not val]
-        return False, f'SMTP not fully configured — missing: {", ".join(missing)}.'
+        err = f'SMTP not fully configured — missing: {", ".join(missing)}.'
+        _log(False, err)
+        return False, err
 
     try:
         port = int(port_str)
     except (ValueError, TypeError):
-        return False, f'Invalid SMTP port "{port_str}".'
+        err = f'Invalid SMTP port "{port_str}".'
+        _log(False, err)
+        return False, err
 
     # Build message
     if body_html:
@@ -55,30 +72,35 @@ def send_email(to_addr, subject, body_text, body_html=None):
                     server.starttls(context=ssl.create_default_context())
                 server.login(username, password)
                 server.sendmail(username, to_addr, msg.as_string())
+        _log(True)
         return True, None
 
     except smtplib.SMTPAuthenticationError:
-        return False, 'SMTP authentication failed — check your username and password.'
+        err = 'SMTP authentication failed — check your username and password.'
     except smtplib.SMTPConnectError:
-        return False, f'Could not connect to {host}:{port}.'
+        err = f'Could not connect to {host}:{port}.'
     except smtplib.SMTPServerDisconnected:
-        return False, 'Server disconnected unexpectedly.'
+        err = 'Server disconnected unexpectedly.'
     except smtplib.SMTPSenderRefused:
-        return False, f'Server refused the sender address ({username}).'
+        err = f'Server refused the sender address ({username}).'
     except smtplib.SMTPRecipientsRefused:
-        return False, f'Server refused the recipient address ({to_addr}).'
+        err = f'Server refused the recipient address ({to_addr}).'
     except smtplib.SMTPException as e:
-        return False, f'SMTP error: {e}'
+        err = f'SMTP error: {e}'
     except OSError as e:
         msg_str = str(e)
         if 'Name or service not known' in msg_str or 'getaddrinfo failed' in msg_str:
-            return False, f'Could not resolve host "{host}". Check the hostname.'
-        if 'Connection refused' in msg_str or 'Errno 111' in msg_str:
-            return False, f'Connection refused on port {port}. Check the port and encryption setting.'
-        if 'Network is unreachable' in msg_str or 'Errno 101' in msg_str:
-            return False, 'Network is unreachable — outbound SMTP may be blocked by your hosting provider.'
-        if 'timed out' in msg_str.lower():
-            return False, f'Connection timed out — port {port} may be blocked or the host is not responding.'
-        return False, f'Network error: {e}'
+            err = f'Could not resolve host "{host}". Check the hostname.'
+        elif 'Connection refused' in msg_str or 'Errno 111' in msg_str:
+            err = f'Connection refused on port {port}. Check the port and encryption setting.'
+        elif 'Network is unreachable' in msg_str or 'Errno 101' in msg_str:
+            err = 'Network is unreachable — outbound SMTP may be blocked by your hosting provider.'
+        elif 'timed out' in msg_str.lower():
+            err = f'Connection timed out — port {port} may be blocked or the host is not responding.'
+        else:
+            err = f'Network error: {e}'
     except Exception as e:
-        return False, f'Unexpected error: {e}'
+        err = f'Unexpected error: {e}'
+
+    _log(False, err)
+    return False, err

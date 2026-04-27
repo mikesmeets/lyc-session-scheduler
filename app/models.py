@@ -109,6 +109,15 @@ class WaiverLink(db.Model):
     sort_order = db.Column(db.Integer, default=0)
 
 
+class EmailLog(db.Model):
+    id        = db.Column(db.Integer, primary_key=True)
+    sent_at   = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    to_addr   = db.Column(db.String(200), nullable=False)
+    subject   = db.Column(db.String(200))
+    success   = db.Column(db.Boolean, nullable=False)
+    error_msg = db.Column(db.Text)
+
+
 class PasswordResetToken(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

@@ -6,8 +6,9 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import Fleet, Session, Signup, Sailor, User, AppSetting, WaiverLink
+from ..models import Fleet, Session, Signup, Sailor, User, AppSetting, WaiverLink, EmailLog
 from .. import db
+from ..email_utils import send_email
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -553,7 +554,8 @@ def email_settings():
         'smtp_from_name':  AppSetting.get('smtp_from_name', 'LYC Jr Sailing'),
         'smtp_password_set': bool(AppSetting.get('smtp_password')),
     }
-    return render_template('admin/email_settings.html', config=config)
+    logs = EmailLog.query.order_by(EmailLog.sent_at.desc()).limit(50).all()
+    return render_template('admin/email_settings.html', config=config, logs=logs)
 
 
 def _friendly_smtp_error(e):
@@ -605,62 +607,39 @@ def _friendly_smtp_error(e):
 def test_email():
     to_addr = request.form.get('test_to', '').strip()
 
-    host       = AppSetting.get('smtp_host')
-    port_str   = AppSetting.get('smtp_port', '587')
-    encryption = AppSetting.get('smtp_encryption', 'tls')
-    username   = AppSetting.get('smtp_username')
-    password   = AppSetting.get('smtp_password')
-    from_name  = AppSetting.get('smtp_from_name', 'LYC Jr Sailing')
-
     config = {
-        'smtp_host':       host,
-        'smtp_port':       port_str,
-        'smtp_encryption': encryption,
-        'smtp_username':   username,
-        'smtp_from_name':  from_name,
-        'smtp_password_set': bool(password),
+        'smtp_host':       AppSetting.get('smtp_host'),
+        'smtp_port':       AppSetting.get('smtp_port', '587'),
+        'smtp_encryption': AppSetting.get('smtp_encryption', 'tls'),
+        'smtp_username':   AppSetting.get('smtp_username'),
+        'smtp_from_name':  AppSetting.get('smtp_from_name', 'LYC Jr Sailing'),
+        'smtp_password_set': bool(AppSetting.get('smtp_password')),
     }
 
-    def render_with_error(title, detail, test_to=''):
+    def render_with_error(title, detail):
+        logs = EmailLog.query.order_by(EmailLog.sent_at.desc()).limit(50).all()
         return render_template('admin/email_settings.html',
                                config=config,
                                test_error_title=title,
                                test_error_detail=detail,
-                               test_to=test_to), 200
+                               test_to=to_addr,
+                               logs=logs), 200
 
     if not to_addr:
-        return render_with_error('Missing recipient', 'Please enter an email address to send the test to.')
+        return render_with_error('Missing recipient',
+                                 'Please enter an email address to send the test to.')
 
-    if not host or not username or not password:
-        missing = [f for f, v in [('Host', host), ('Username', username), ('Password', password)] if not v]
-        return render_with_error('Incomplete configuration',
-                                 f'The following fields are not set: {", ".join(missing)}. '
-                                 'Save your SMTP settings before sending a test.')
-
-    try:
-        port = int(port_str)
-    except (ValueError, TypeError):
-        return render_with_error('Invalid port', f'"{port_str}" is not a valid port number.', to_addr)
-
-    msg = MIMEText('This is a test email from your LYC Jr Sailing app. SMTP is configured correctly!')
-    msg['Subject'] = 'LYC Jr Sailing — Test Email'
-    msg['From']    = f'{from_name} <{username}>'
-    msg['To']      = to_addr
-
-    try:
-        if encryption == 'ssl':
-            ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=ctx, timeout=10) as server:
-                server.login(username, password)
-                server.sendmail(username, to_addr, msg.as_string())
-        else:
-            with smtplib.SMTP(host, port, timeout=10) as server:
-                if encryption == 'tls':
-                    server.starttls(context=ssl.create_default_context())
-                server.login(username, password)
-                server.sendmail(username, to_addr, msg.as_string())
+    ok, err = send_email(
+        to_addr   = to_addr,
+        subject   = 'LYC Jr Sailing — Test Email',
+        body_text = 'This is a test email from your LYC Jr Sailing app. SMTP is configured correctly!',
+    )
+    if ok:
         flash(f'Test email sent successfully to {to_addr}.', 'success')
         return redirect(url_for('admin.email_settings'))
-    except Exception as e:
-        title, detail = _friendly_smtp_error(e)
-        return render_with_error(title, detail, to_addr)
+
+    # Split the flat error string into a short title + detail for display
+    parts = err.split(' — ', 1)
+    title  = parts[0]
+    detail = parts[1] if len(parts) > 1 else err
+    return render_with_error(title, detail)
