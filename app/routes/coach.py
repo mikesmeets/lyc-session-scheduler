@@ -281,8 +281,13 @@ def attendance(session_id):
                 flash('No recipients — select at least one group or add coaches/admins first.', 'warning')
                 return redirect(url_for('coach.attendance', session_id=session_id))
 
-            # Build email content
-            subject, body_text, body_html = _build_summary_email(sess, session_weather)
+            # Build email content (fetch weather here — not available in POST scope otherwise)
+            _wx = {}
+            try:
+                _wx = wx.get_weather_for_sessions([sess])
+            except Exception:
+                pass
+            subject, body_text, body_html = _build_summary_email(sess, _wx.get(sess.id))
 
             ok, err = send_email_multi(to_addrs, bcc_addrs, subject, body_text, body_html)
             n = len(to_addrs) + len(bcc_addrs)
