@@ -7,7 +7,6 @@ Create Date: 2026-05-04 21:07:08.219512
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.engine.reflection import Inspector
 
 
 # revision identifiers, used by Alembic.
@@ -18,12 +17,12 @@ depends_on = None
 
 
 def _column_exists(conn, table, column):
-    insp = Inspector.from_engine(conn)
+    insp = sa.inspect(conn)
     return any(c['name'] == column for c in insp.get_columns(table))
 
 
 def _table_exists(conn, table):
-    insp = Inspector.from_engine(conn)
+    insp = sa.inspect(conn)
     return table in insp.get_table_names()
 
 
@@ -31,10 +30,11 @@ def upgrade():
     conn = op.get_bind()
 
     # ── user.is_coach ─────────────────────────────────────────────────────────
+    # Use 'false' not '0' — PostgreSQL rejects integer literals for booleans
     if not _column_exists(conn, 'user', 'is_coach'):
         with op.batch_alter_table('user', schema=None) as batch_op:
             batch_op.add_column(sa.Column('is_coach', sa.Boolean(), nullable=False,
-                                          server_default=sa.text('0')))
+                                          server_default=sa.text('false')))
 
     # ── session coach notes ───────────────────────────────────────────────────
     if not _column_exists(conn, 'session', 'coach_notes_public'):
@@ -59,7 +59,7 @@ def upgrade():
             sa.Column('sailor_id',   sa.Integer(),  sa.ForeignKey('sailor.id'),   nullable=False),
             sa.Column('present',     sa.Boolean(),  nullable=True),
             sa.Column('is_walkin',   sa.Boolean(),  nullable=True,
-                                     server_default=sa.text('0')),
+                                     server_default=sa.text('false')),
             sa.Column('recorded_at', sa.DateTime(), nullable=True),
             sa.UniqueConstraint('session_id', 'sailor_id', name='unique_attendance'),
         )
