@@ -82,18 +82,6 @@
                    autocomplete="new-password">
           </div>
 
-          <hr class="my-4">
-
-          <div class="mb-4">
-            <label class="form-label fw-semibold">Accounting Email</label>
-            <input type="email" name="accounting_email" class="form-control"
-                   value="{{ config.accounting_email }}"
-                   placeholder="accounting@larchmontyc.org">
-            <div class="form-text">
-              Address to CC or notify for billing-related emails (registrations, payments, etc.).
-            </div>
-          </div>
-
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-floppy me-1"></i>Save Settings
           </button>
@@ -172,6 +160,31 @@
             {{ 'STARTTLS' if config.smtp_encryption == 'tls' else ('SSL/TLS' if config.smtp_encryption == 'ssl' else 'No encryption') }}
           </li>
         </ul>
+      </div>
+    </div>
+
+    {# ── Accounting Email ── #}
+    <div class="card mt-3">
+      <div class="card-header fw-bold"><i class="bi bi-receipt me-1"></i>Accounting Email</div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.email_settings') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {# Re-post all SMTP fields unchanged so they aren't cleared #}
+          <input type="hidden" name="smtp_from_name"  value="{{ config.smtp_from_name }}">
+          <input type="hidden" name="smtp_host"        value="{{ config.smtp_host }}">
+          <input type="hidden" name="smtp_port"        value="{{ config.smtp_port }}">
+          <input type="hidden" name="smtp_encryption"  value="{{ config.smtp_encryption }}">
+          <input type="hidden" name="smtp_username"    value="{{ config.smtp_username }}">
+          <div class="mb-3">
+            <input type="email" name="accounting_email" class="form-control"
+                   value="{{ config.accounting_email }}"
+                   placeholder="accounting@larchmontyc.org">
+            <div class="form-text">CC'd on billing-related emails.</div>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary">
+            <i class="bi bi-floppy me-1"></i>Save
+          </button>
+        </form>
       </div>
     </div>
   </div>
