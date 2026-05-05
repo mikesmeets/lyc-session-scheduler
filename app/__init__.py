@@ -47,6 +47,12 @@ def create_app():
     app.register_blueprint(coach_bp, url_prefix='/coach')
 
     with app.app_context():
+        # Run any pending Alembic migrations, then create tables not yet tracked
+        try:
+            from flask_migrate import upgrade as _db_upgrade
+            _db_upgrade()
+        except Exception as e:
+            app.logger.warning('flask db upgrade failed (may be fine on first run): %s', e)
         db.create_all()
         _seed_data()
 
