@@ -20,9 +20,8 @@
   </div>
 </div>
 
-<form method="POST">
+<form method="POST" id="main_form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <input type="hidden" name="action" value="save">
 
   <div class="row g-4">
     {# ── Left: Attendance table ── #}
@@ -220,9 +219,63 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100">
+      <button type="submit" name="action" value="save" class="btn btn-primary w-100">
         <i class="bi bi-floppy me-1"></i>Save Attendance &amp; Notes
       </button>
+
+      {# ── Publish Summary ── #}
+      <div class="card mt-3">
+        <div class="card-header fw-bold d-flex align-items-center gap-2">
+          <i class="bi bi-send text-success"></i>Publish Summary
+        </div>
+        <div class="card-body">
+          <p class="text-muted small mb-3">
+            Saves notes and emails a session summary to the selected groups.
+          </p>
+          <div class="mb-3">
+            {% set present_count = sess.attendances | selectattr('present', 'equalto', true) | list | length %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="include_parents"
+                     value="1" id="chk_parents" checked>
+              <label class="form-check-label" for="chk_parents">
+                Parents of attendees
+                <span class="text-muted small">({{ present_count }} present)</span>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="include_admins"
+                     value="1" id="chk_admins" checked>
+              <label class="form-check-label" for="chk_admins">Admins</label>
+            </div>
+            {% if accounting_email %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="include_accounting"
+                     value="1" id="chk_accounting" checked>
+              <label class="form-check-label" for="chk_accounting">
+                Accounting
+                <span class="text-muted small">({{ accounting_email }})</span>
+              </label>
+            </div>
+            {% endif %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="include_coaches"
+                     value="1" id="chk_coaches" checked>
+              <label class="form-check-label" for="chk_coaches">
+                Coaches
+                {% if sess.coaches %}
+                <span class="text-muted small">({{ sess.coaches | map(attribute='name') | join(', ') }})</span>
+                {% endif %}
+              </label>
+            </div>
+          </div>
+          <button type="submit" name="action" value="publish"
+                  class="btn btn-success w-100"
+                  onclick="return confirm('Send session summary email now?')">
+            <i class="bi bi-send me-1"></i>Publish &amp; Send
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 </form>
