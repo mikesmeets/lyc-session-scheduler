@@ -431,7 +431,15 @@
       {% endif %}
 
       <tr class="{{ row_class }}">
-        <td class="fw-semibold text-nowrap">{{ sess.date.strftime('%a, %b %#d') }}</td>
+        <td class="fw-semibold text-nowrap">
+          {{ sess.date.strftime('%a, %b %#d') }}
+          {% if sess.coaches %}
+          <div class="text-muted fw-normal" style="font-size:.75rem;">
+            <i class="bi bi-person-badge text-primary"></i>
+            {% for c in sess.coaches %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+          </div>
+          {% endif %}
+        </td>
 
         <td>
           <span class="badge border" style="background-color:{{ sess.fleet.color or '#fff' }}; color:#333;">
@@ -615,6 +623,14 @@
         </p>
         {% if sess.notes %}
         <p class="small mt-2 mb-0 text-muted">{{ sess.notes }}</p>
+        {% endif %}
+
+        {# Coaches #}
+        {% if sess.coaches %}
+        <p class="small text-muted mt-2 mb-0">
+          <i class="bi bi-person-badge me-1 text-primary"></i>
+          {% for c in sess.coaches %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+        </p>
         {% endif %}
 
         {# Weather #}

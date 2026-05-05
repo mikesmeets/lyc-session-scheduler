@@ -227,12 +227,16 @@ def session_detail(session_id):
     same_fleet  = [s for s in all_sailors if s.fleet_id == session.fleet_id  and s.id not in signed_up_ids]
     other_fleet = [s for s in all_sailors if s.fleet_id != session.fleet_id  and s.id not in signed_up_ids]
     att_by_sailor = {a.sailor_id: a for a in session.attendances}
+    all_coaches       = User.query.filter_by(is_coach=True).order_by(User.last_name, User.first_name).all()
+    unassigned_coaches = [c for c in all_coaches if c not in session.coaches]
     return render_template('admin/session_detail.html',
                            session=session,
                            today=date.today(),
                            available_sailors=same_fleet,
                            other_fleet_sailors=other_fleet,
-                           att_by_sailor=att_by_sailor)
+                           att_by_sailor=att_by_sailor,
+                           all_coaches=all_coaches,
+                           unassigned_coaches=unassigned_coaches)
 
 
 @admin_bp.route('/sessions/<int:session_id>/add-signup', methods=['POST'])
@@ -275,6 +279,34 @@ def admin_remove_signup(session_id, sailor_id):
     sess.update_status()
     db.session.commit()
     flash(f'Removed {sailor_name} from this session.', 'success')
+    return redirect(url_for('admin.session_detail', session_id=session_id))
+
+
+@admin_bp.route('/sessions/<int:session_id>/add-coach', methods=['POST'])
+@login_required
+@admin_required
+def admin_add_coach(session_id):
+    session  = Session.query.get_or_404(session_id)
+    coach_id = request.form.get('coach_id', type=int)
+    if coach_id:
+        coach = User.query.get(coach_id)
+        if coach and coach not in session.coaches:
+            session.coaches.append(coach)
+            db.session.commit()
+            flash(f'{coach.name} added as coach.', 'success')
+    return redirect(url_for('admin.session_detail', session_id=session_id))
+
+
+@admin_bp.route('/sessions/<int:session_id>/remove-coach/<int:coach_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_remove_coach(session_id, coach_id):
+    session = Session.query.get_or_404(session_id)
+    coach   = User.query.get_or_404(coach_id)
+    if coach in session.coaches:
+        session.coaches.remove(coach)
+        db.session.commit()
+        flash(f'{coach.name} removed from session.', 'success')
     return redirect(url_for('admin.session_detail', session_id=session_id))
 
 

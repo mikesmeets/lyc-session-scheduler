@@ -153,8 +153,50 @@
       </div>
     </div>
 
-    {# ── Right: Weather + Notes ── #}
+    {# ── Right: Coaches + Weather + Notes ── #}
     <div class="col-lg-5">
+
+      {# Coaches #}
+      <div class="card mb-3">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-person-badge me-1 text-primary"></i>Coaches</span>
+        </div>
+        <div class="card-body py-2">
+          {% if sess.coaches %}
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            {% for coach in sess.coaches %}
+            <span class="badge bg-primary d-flex align-items-center gap-1 px-2 py-1" style="font-size:.85rem;">
+              {{ coach.name }}
+              <button type="submit" form="remove_coach_form_{{ coach.id }}"
+                      class="btn-close btn-close-white ms-1" style="font-size:.6rem;"
+                      title="Remove {{ coach.name }}"
+                      onclick="return confirm('Remove {{ coach.name }} from this session?')">
+              </button>
+            </span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small mb-2">No coaches assigned yet.</p>
+          {% endif %}
+
+          {% if unassigned_coaches %}
+          <form method="POST" class="d-flex gap-2 align-items-center mt-1">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="add_coach">
+            <select name="coach_id" class="form-select form-select-sm flex-grow-1">
+              <option value="">— add coach —</option>
+              {% for c in unassigned_coaches %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">
+              <i class="bi bi-plus-lg"></i> Add
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
       {{ weather_block(session_weather) }}
       <div class="card mb-3">
         <div class="card-header fw-bold">
@@ -197,6 +239,15 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="action" value="remove_walkin">
   <input type="hidden" name="walkin_sailor_id" value="{{ att.sailor_id }}">
+</form>
+{% endfor %}
+
+{# One remove form per assigned coach #}
+{% for coach in sess.coaches %}
+<form id="remove_coach_form_{{ coach.id }}" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="remove_coach">
+  <input type="hidden" name="coach_id" value="{{ coach.id }}">
 </form>
 {% endfor %}
 {% endblock %}

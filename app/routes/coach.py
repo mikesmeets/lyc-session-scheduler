@@ -4,7 +4,7 @@ from datetime import date
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 
-from ..models import Session, Sailor, Signup, Attendance
+from ..models import Session, Sailor, Signup, Attendance, User
 from .. import db
 from .. import weather as wx
 
@@ -122,6 +122,26 @@ def attendance(session_id):
                     flash('Walk-in removed.', 'success')
             return redirect(url_for('coach.attendance', session_id=session_id))
 
+        if action == 'add_coach':
+            coach_id = request.form.get('coach_id', type=int)
+            if coach_id:
+                coach = User.query.get(coach_id)
+                if coach and coach not in sess.coaches:
+                    sess.coaches.append(coach)
+                    db.session.commit()
+                    flash(f'{coach.name} added as coach.', 'success')
+            return redirect(url_for('coach.attendance', session_id=session_id))
+
+        if action == 'remove_coach':
+            coach_id = request.form.get('coach_id', type=int)
+            if coach_id:
+                coach = User.query.get(coach_id)
+                if coach and coach in sess.coaches:
+                    sess.coaches.remove(coach)
+                    db.session.commit()
+                    flash(f'{coach.name} removed from session.', 'success')
+            return redirect(url_for('coach.attendance', session_id=session_id))
+
         # --- Save attendance + notes ---
         # Collect all sailors being tracked (signups + walk-ins)
         all_sailor_ids = list(signup_sailor_ids | walkin_ids)
@@ -154,6 +174,9 @@ def attendance(session_id):
         flash('Attendance and notes saved.', 'success')
         return redirect(url_for('coach.attendance', session_id=session_id))
 
+    all_coaches = User.query.filter_by(is_coach=True).order_by(User.last_name, User.first_name).all()
+    unassigned_coaches = [c for c in all_coaches if c not in sess.coaches]
+
     session_wx = {}
     try:
         session_wx = wx.get_weather_for_sessions([sess])
@@ -168,4 +191,6 @@ def attendance(session_id):
                            att_by_sailor=att_by_sailor,
                            available_walkins=available_walkins,
                            today=date.today(),
+                           all_coaches=all_coaches,
+                           unassigned_coaches=unassigned_coaches,
                            session_weather=session_weather)

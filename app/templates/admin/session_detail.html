@@ -47,13 +47,44 @@
         {% if session.notes %}
         <p class="text-muted">{{ session.notes }}</p>
         {% endif %}
-        {% if session.coaches %}
-        <p class="mb-1">
-          <i class="bi bi-person-badge me-1 text-primary"></i>
-          <strong>Coaches:</strong>
-          {% for c in session.coaches %}{{ c.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-        </p>
-        {% endif %}
+        {# ── Coaches inline management ── #}
+        <div class="mt-2 mb-1">
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+            <span class="fw-semibold small"><i class="bi bi-person-badge me-1 text-primary"></i>Coaches:</span>
+            {% if session.coaches %}
+              {% for coach in session.coaches %}
+              <span class="badge bg-primary d-inline-flex align-items-center gap-1 px-2 py-1">
+                {{ coach.name }}
+                <form method="POST"
+                      action="{{ url_for('admin.admin_remove_coach', session_id=session.id, coach_id=coach.id) }}"
+                      class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-close btn-close-white ms-1"
+                          style="font-size:.55rem;" title="Remove {{ coach.name }}"></button>
+                </form>
+              </span>
+              {% endfor %}
+            {% else %}
+              <span class="text-muted small">None assigned</span>
+            {% endif %}
+          </div>
+          {% if unassigned_coaches %}
+          <form method="POST"
+                action="{{ url_for('admin.admin_add_coach', session_id=session.id) }}"
+                class="d-flex gap-2 align-items-center mt-1">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="coach_id" class="form-select form-select-sm" style="max-width:200px;">
+              <option value="">— add coach —</option>
+              {% for c in unassigned_coaches %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-plus-lg"></i> Add
+            </button>
+          </form>
+          {% endif %}
+        </div>
 
         {# Progress #}
         <div class="mt-3">
