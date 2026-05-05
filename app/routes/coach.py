@@ -103,6 +103,17 @@ def attendance(session_id):
                     flash('Walk-in added.', 'success')
             return redirect(url_for('coach.attendance', session_id=session_id))
 
+        if action == 'remove_walkin':
+            walkin_id = request.form.get('walkin_sailor_id', type=int)
+            if walkin_id:
+                record = Attendance.query.filter_by(
+                    session_id=session_id, sailor_id=walkin_id, is_walkin=True).first()
+                if record:
+                    db.session.delete(record)
+                    db.session.commit()
+                    flash('Walk-in removed.', 'success')
+            return redirect(url_for('coach.attendance', session_id=session_id))
+
         # --- Save attendance + notes ---
         # Collect all sailors being tracked (signups + walk-ins)
         all_sailor_ids = list(signup_sailor_ids | walkin_ids)

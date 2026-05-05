@@ -40,6 +40,7 @@
                 <th class="ps-3">Sailor</th>
                 <th>Fleet</th>
                 <th class="text-center" style="min-width:200px">Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -73,6 +74,7 @@
                     <label class="btn btn-outline-secondary" for="u_{{ sailor.id }}">—</label>
                   </div>
                 </td>
+                <td></td>
               </tr>
               {% endfor %}
 
@@ -102,6 +104,13 @@
                            {{ 'checked' if att.present is none }}>
                     <label class="btn btn-outline-secondary" for="u_{{ sailor.id }}">—</label>
                   </div>
+                </td>
+                <td class="text-end pe-2">
+                  <button type="submit" form="remove_walkin_form_{{ sailor.id }}"
+                          class="btn btn-sm btn-outline-danger py-0" title="Remove walk-in"
+                          onclick="return confirm('Remove {{ sailor.name }} as a walk-in?')">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
                 </td>
               </tr>
               {% endfor %}
@@ -174,9 +183,18 @@
   </div>
 </form>
 
-{# Walk-in form (separate so it doesn't interfere with the main save) #}
+{# Walk-in add form (separate so it doesn't interfere with the main save) #}
 <form id="walkin_form" method="POST">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="action" value="add_walkin">
 </form>
+
+{# One remove form per walk-in #}
+{% for att in walkin_records %}
+<form id="remove_walkin_form_{{ att.sailor_id }}" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="remove_walkin">
+  <input type="hidden" name="walkin_sailor_id" value="{{ att.sailor_id }}">
+</form>
+{% endfor %}
 {% endblock %}
