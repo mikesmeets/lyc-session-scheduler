@@ -47,11 +47,14 @@ def create_app():
     app.register_blueprint(coach_bp, url_prefix='/coach')
 
     with app.app_context():
-        # Run any pending Alembic migrations, then create tables not yet tracked
+        # Create any tables not yet in the DB (safe no-op on existing tables),
+        # then run Alembic migrations for schema changes, then seed initial data.
+        # Order matters: create_all() must run first so migrations can inspect
+        # existing columns on a brand-new database without crashing.
         try:
+            db.create_all()
             from flask_migrate import upgrade as _db_upgrade
             _db_upgrade()
-            db.create_all()
             _seed_data()
         except Exception as e:
             app.logger.error('Startup DB setup failed: %s', e)

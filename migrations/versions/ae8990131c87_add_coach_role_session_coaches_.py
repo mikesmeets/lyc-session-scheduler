@@ -18,6 +18,8 @@ depends_on = None
 
 def _column_exists(conn, table, column):
     insp = sa.inspect(conn)
+    if not insp.has_table(table):
+        return False   # table doesn't exist → column can't exist either
     return any(c['name'] == column for c in insp.get_columns(table))
 
 
