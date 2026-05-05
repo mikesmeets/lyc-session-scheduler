@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from ..models import Fleet, Session, Sailor, Signup, AppSetting, WaiverLink
 from .. import db
+from .. import weather as wx
 
 main = Blueprint('main', __name__)
 
@@ -92,6 +93,15 @@ def index():
             for s in sessions:
                 sessions_by_date.setdefault(s.date, []).append(s)
 
+    # Fetch weather for list/cards views (future sessions only; skip calendar
+    # to avoid fetching weather for past months the user is browsing)
+    weather = {}
+    if view != 'calendar':
+        try:
+            weather = wx.get_weather_for_sessions(sessions)
+        except Exception:
+            pass
+
     return render_template('index.html',
         fleets=fleets,
         sessions=sessions,
@@ -102,6 +112,7 @@ def index():
         selected_sailor_id=selected_sailor_id,
         hide_empty=hide_empty,
         confirmed_only=confirmed_only,
+        weather=weather,
         # calendar-specific
         cal_year=cal_year,
         cal_month=cal_month,

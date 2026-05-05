@@ -1,0 +1,73 @@
+{# ── Weather display macros ────────────────────────────────────────────────── #}
+{# Import with: {% from '_weather.html' import weather_badge, weather_block %} #}
+
+{# Compact one-liner for tables: "🌬️ 12 kn NW (g18)  ⛅ 68°F" #}
+{% macro weather_badge(w) %}
+{% if w %}
+<span class="text-nowrap small">
+  <i class="bi bi-wind text-primary"></i>
+  <strong>{{ w.wind_speed }}</strong> kn {{ w.wind_dir }}
+  {% if w.wind_gust and w.wind_gust > w.wind_speed %}
+    <span class="text-muted">(g{{ w.wind_gust }})</span>
+  {% endif %}
+  &nbsp;
+  <i class="bi {{ w.icon }}"></i>
+  {% if w.temp is not none %}<span class="text-muted">{{ w.temp }}°F</span>{% endif %}
+  {% if w.is_forecast and w.precip_prob is not none and w.precip_prob > 20 %}
+    <i class="bi bi-droplet-half text-info ms-1" title="{{ w.precip_prob }}% rain"></i>{{ w.precip_prob }}%
+  {% endif %}
+</span>
+{% endif %}
+{% endmacro %}
+
+{# Full block for sidebar / detail panels #}
+{% macro weather_block(w) %}
+{% if w %}
+<div class="card mb-3">
+  <div class="card-header fw-bold d-flex align-items-center gap-2">
+    <i class="bi bi-wind text-primary"></i>
+    {% if w.is_forecast %}Forecast{% else %}Conditions{% endif %}
+  </div>
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-3 align-items-center">
+
+      {# Wind #}
+      <div class="text-center">
+        <div class="fs-4 fw-bold text-primary">{{ w.wind_speed }}<small class="fs-6 fw-normal"> kn</small></div>
+        <div class="small text-muted">Wind {{ w.wind_dir }}</div>
+      </div>
+
+      {% if w.wind_gust and w.wind_gust > w.wind_speed %}
+      <div class="text-center">
+        <div class="fs-4 fw-bold text-warning">{{ w.wind_gust }}<small class="fs-6 fw-normal"> kn</small></div>
+        <div class="small text-muted">Gusts</div>
+      </div>
+      {% endif %}
+
+      <div class="vr"></div>
+
+      {# Conditions #}
+      <div>
+        <div class="fw-semibold">
+          <i class="bi {{ w.icon }} me-1"></i>{{ w.description }}
+        </div>
+        {% if w.temp is not none %}
+        <div class="small text-muted"><i class="bi bi-thermometer-half me-1"></i>{{ w.temp }}°F</div>
+        {% endif %}
+        {% if w.is_forecast and w.precip_prob is not none %}
+        <div class="small text-muted"><i class="bi bi-droplet me-1"></i>{{ w.precip_prob }}% chance of rain</div>
+        {% elif not w.is_forecast and w.precip is not none and w.precip > 0 %}
+        <div class="small text-muted"><i class="bi bi-droplet-fill text-info me-1"></i>{{ w.precip }}" precipitation</div>
+        {% endif %}
+      </div>
+
+    </div>
+    {% if not w.is_forecast %}
+    <div class="mt-1 small text-muted fst-italic">Historical conditions at session time</div>
+    {% else %}
+    <div class="mt-1 small text-muted fst-italic">Forecast — updates automatically</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}

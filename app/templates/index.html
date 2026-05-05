@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_weather.html' import weather_badge, weather_block %}
 {% block title %}Schedule — LYC Jr Sailing{% endblock %}
 
 {% block content %}
@@ -392,6 +393,7 @@
         <th>Status</th>
         <th style="min-width:160px">Progress</th>
         <th>Deadline</th>
+        <th><i class="bi bi-wind"></i> Weather</th>
         {% if is_parent %}
           {% if selected_sailor.obj %}
             {# Single sailor: one wide status+action column #}
@@ -478,6 +480,8 @@
           {{ sess.commitment_deadline.strftime('%b %#d') }}
           {% if deadline_passed %}<br><span class="badge bg-danger">Closed</span>{% endif %}
         </td>
+
+        <td class="small">{{ weather_badge(weather.get(sess.id)) }}</td>
 
         {% if is_parent %}
           {% if selected_sailor.obj %}
@@ -611,6 +615,14 @@
         </p>
         {% if sess.notes %}
         <p class="small mt-2 mb-0 text-muted">{{ sess.notes }}</p>
+        {% endif %}
+
+        {# Weather #}
+        {% set wx_data = weather.get(sess.id) %}
+        {% if wx_data %}
+        <div class="mt-2 pt-2 border-top small">
+          {{ weather_badge(wx_data) }}
+        </div>
         {% endif %}
 
         {# Sailor signup status #}

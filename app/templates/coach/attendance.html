@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_weather.html' import weather_block %}
 {% block title %}Attendance — {{ sess.date.strftime('%b %#d, %Y') }}{% endblock %}
 
 {% block content %}
@@ -152,8 +153,9 @@
       </div>
     </div>
 
-    {# ── Right: Notes ── #}
+    {# ── Right: Weather + Notes ── #}
     <div class="col-lg-5">
+      {{ weather_block(session_weather) }}
       <div class="card mb-3">
         <div class="card-header fw-bold">
           <i class="bi bi-megaphone me-1"></i>Public Notes

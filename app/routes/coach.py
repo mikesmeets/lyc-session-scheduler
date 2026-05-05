@@ -6,6 +6,7 @@ from flask_login import login_required, current_user
 
 from ..models import Session, Sailor, Signup, Attendance
 from .. import db
+from .. import weather as wx
 
 coach_bp = Blueprint('coach', __name__)
 
@@ -51,11 +52,18 @@ def dashboard():
     # Build a set of session IDs that have any attendance recorded
     attended_ids = {a.session_id for a in Attendance.query.all()}
 
+    weather = {}
+    try:
+        weather = wx.get_weather_for_sessions(upcoming + past)
+    except Exception:
+        pass
+
     return render_template('coach/dashboard.html',
                            upcoming=upcoming,
                            past=past,
                            attended_ids=attended_ids,
-                           today=today)
+                           today=today,
+                           weather=weather)
 
 
 @coach_bp.route('/session/<int:session_id>/attendance', methods=['GET', 'POST'])
@@ -146,10 +154,18 @@ def attendance(session_id):
         flash('Attendance and notes saved.', 'success')
         return redirect(url_for('coach.attendance', session_id=session_id))
 
+    session_wx = {}
+    try:
+        session_wx = wx.get_weather_for_sessions([sess])
+    except Exception:
+        pass
+    session_weather = session_wx.get(sess.id)
+
     return render_template('coach/attendance.html',
                            sess=sess,
                            signups_sorted=signups_sorted,
                            walkin_records=walkin_records,
                            att_by_sailor=att_by_sailor,
                            available_walkins=available_walkins,
-                           today=date.today())
+                           today=date.today(),
+                           session_weather=session_weather)

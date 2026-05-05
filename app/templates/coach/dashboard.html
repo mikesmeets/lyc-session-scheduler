@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_weather.html' import weather_badge %}
 {% block title %}Coach Dashboard{% endblock %}
 
 {% block content %}
@@ -15,6 +16,7 @@
         <th>Fleet</th>
         <th>Type</th>
         <th>Status</th>
+        <th><i class="bi bi-wind"></i> Forecast</th>
         <th>Attendance</th>
         <th></th>
       </tr>
@@ -36,6 +38,7 @@
             <span class="badge bg-light text-dark border">Pending</span>
           {% endif %}
         </td>
+        <td class="small">{{ weather_badge(weather.get(sess.id)) }}</td>
         <td>
           {% if sess.id in attended_ids %}
             <span class="badge bg-info text-dark"><i class="bi bi-check2"></i> Taken</span>
@@ -68,6 +71,7 @@
         <th>Date</th>
         <th>Fleet</th>
         <th>Type</th>
+        <th><i class="bi bi-wind"></i> Conditions</th>
         <th>Attendance</th>
         <th></th>
       </tr>
@@ -78,6 +82,7 @@
         <td>{{ sess.date.strftime('%a, %b %#d, %Y') }}</td>
         <td>{{ sess.fleet.name }}</td>
         <td class="small">{{ sess.session_type.replace('_', ' ').title() }}</td>
+        <td class="small">{{ weather_badge(weather.get(sess.id)) }}</td>
         <td>
           {% if sess.id in attended_ids %}
             <span class="badge bg-info text-dark"><i class="bi bi-check2"></i> Taken</span>
