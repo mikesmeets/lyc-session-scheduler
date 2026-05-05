@@ -706,17 +706,19 @@ def email_settings():
         if new_password:
             AppSetting.set('smtp_password', new_password)
         AppSetting.set('smtp_from_name',  request.form.get('smtp_from_name', '').strip())
+        AppSetting.set('accounting_email', request.form.get('accounting_email', '').strip())
         db.session.commit()
         flash('Email settings saved.', 'success')
         return redirect(url_for('admin.email_settings'))
 
     config = {
-        'smtp_host':       AppSetting.get('smtp_host'),
-        'smtp_port':       AppSetting.get('smtp_port', '587'),
-        'smtp_encryption': AppSetting.get('smtp_encryption', 'tls'),
-        'smtp_username':   AppSetting.get('smtp_username'),
-        'smtp_from_name':  AppSetting.get('smtp_from_name', 'LYC Jr Sailing'),
+        'smtp_host':        AppSetting.get('smtp_host'),
+        'smtp_port':        AppSetting.get('smtp_port', '587'),
+        'smtp_encryption':  AppSetting.get('smtp_encryption', 'tls'),
+        'smtp_username':    AppSetting.get('smtp_username'),
+        'smtp_from_name':   AppSetting.get('smtp_from_name', 'LYC Jr Sailing'),
         'smtp_password_set': bool(AppSetting.get('smtp_password')),
+        'accounting_email': AppSetting.get('accounting_email', ''),
     }
     logs = EmailLog.query.order_by(EmailLog.sent_at.desc()).limit(50).all()
     return render_template('admin/email_settings.html', config=config, logs=logs)

@@ -75,11 +75,23 @@
             <div class="form-text">Also used as the From address.</div>
           </div>
 
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="form-label">Password</label>
             <input type="password" name="smtp_password" class="form-control"
                    placeholder="{{ '●●●●●●●● (saved — leave blank to keep)' if config.smtp_password_set else 'Enter password' }}"
                    autocomplete="new-password">
+          </div>
+
+          <hr class="my-4">
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Accounting Email</label>
+            <input type="email" name="accounting_email" class="form-control"
+                   value="{{ config.accounting_email }}"
+                   placeholder="accounting@larchmontyc.org">
+            <div class="form-text">
+              Address to CC or notify for billing-related emails (registrations, payments, etc.).
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary">
