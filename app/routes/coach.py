@@ -12,8 +12,11 @@ from ..email_utils import send_email_multi
 coach_bp = Blueprint('coach', __name__)
 
 
-def _build_summary_email(sess, weather=None):
-    """Return (subject, body_text, body_html) for a session summary email."""
+def _build_summary_email(sess, weather=None, include_private=False):
+    """Return (subject, body_text, body_html) for a session summary email.
+
+    include_private=True adds the private coach notes (for coaches/admins only).
+    """
     type_label = sess.session_type.replace('_', ' ').title()
     date_str   = sess.date.strftime('%A, %B %-d, %Y') if hasattr(sess.date, 'strftime') else str(sess.date)
     time_str   = sess.start_time or ''
@@ -44,7 +47,8 @@ def _build_summary_email(sess, weather=None):
         source = 'NOAA GFS' if weather.get('is_forecast') else 'ERA5'
         wx_line = ' · '.join(parts) + f' (Open-Meteo / {source})'
 
-    notes = sess.coach_notes_public or ''
+    public_notes  = sess.coach_notes_public  or ''
+    private_notes = (sess.coach_notes_private or '') if include_private else ''
 
     subject = f"Session Summary: {sess.fleet.name} {type_label} — {sess.date.strftime('%b %-d, %Y')}"
 
@@ -67,8 +71,10 @@ def _build_summary_email(sess, weather=None):
     ]
     for name in attendee_names:
         lines.append(f"  • {name}")
-    if notes:
-        lines += ['', "Coach's Notes", '-' * 30, notes]
+    if public_notes:
+        lines += ['', "Coach's Notes", '-' * 30, public_notes]
+    if private_notes:
+        lines += ['', "Private Notes (coaches & admins only)", '-' * 30, private_notes]
     lines += ['', '—', 'LYC Junior Sailing Training App']
     body_text = '\n'.join(lines)
 
@@ -77,16 +83,29 @@ def _build_summary_email(sess, weather=None):
         return f'<li style="padding:2px 0">{name}</li>'
 
     attendee_items = '\n'.join(li(n) for n in attendee_names) or '<li><em>None recorded</em></li>'
-    notes_block = (
+    public_notes_block = (
         f'<h3 style="color:#0d6efd">Coach\'s Notes</h3>'
-        f'<p style="white-space:pre-wrap;background:#f8f9fa;padding:12px;border-radius:6px">{notes}</p>'
-        if notes else ''
+        f'<p style="white-space:pre-wrap;background:#f8f9fa;padding:12px;border-radius:6px">{public_notes}</p>'
+        if public_notes else ''
+    )
+    private_notes_block = (
+        f'<h3 style="color:#6c757d"><i style="font-size:.85em">&#128274;</i> Private Notes</h3>'
+        f'<p style="white-space:pre-wrap;background:#fff3cd;padding:12px;border-radius:6px;border-left:4px solid #ffc107">{private_notes}</p>'
+        if private_notes else ''
     )
     wx_block = (
         f'<p><strong>Conditions:</strong> {wx_line}</p>'
         if wx_line else ''
     )
     time_block = f'<p><strong>Time:</strong> {time_str}</p>' if time_str else ''
+
+    notes_html = ''
+    if public_notes_block or private_notes_block:
+        notes_html = '<hr style="border:none;border-top:1px solid #dee2e6;margin:16px 0">'
+        notes_html += public_notes_block
+        if public_notes_block and private_notes_block:
+            notes_html += '<hr style="border:none;border-top:1px solid #dee2e6;margin:12px 0">'
+        notes_html += private_notes_block
 
     body_html = f"""<!DOCTYPE html>
 <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#333;padding:0">
@@ -105,7 +124,7 @@ def _build_summary_email(sess, weather=None):
     <ul style="padding-left:20px;margin:0">
       {attendee_items}
     </ul>
-    {('<hr style="border:none;border-top:1px solid #dee2e6;margin:16px 0">' + notes_block) if notes_block else ''}
+    {notes_html}
     <hr style="border:none;border-top:1px solid #dee2e6;margin:24px 0 12px">
     <p style="font-size:11px;color:#adb5bd;margin:0">Sent by LYC Junior Sailing Training App</p>
   </div>
@@ -252,8 +271,11 @@ def attendance(session_id):
             db.session.commit()
 
             # Build recipient lists
-            to_addrs  = []   # visible in To: header
-            bcc_addrs = []   # hidden (parents, accounting)
+            # to_addrs / bcc_addrs  → coaches, admins, accounting (get private notes)
+            # parent_bcc_addrs      → parents only (public notes only)
+            to_addrs       = []   # visible in To: header
+            bcc_addrs      = []   # accounting BCC (internal — gets private notes)
+            parent_bcc_addrs = [] # parents BCC (public notes only)
 
             # Coaches attached to this session always receive the summary
             to_addrs.extend(c.email for c in sess.coaches)
@@ -271,30 +293,50 @@ def attendance(session_id):
                 for att in sess.attendances:
                     if att.present and att.sailor.parent_id not in seen_parents:
                         seen_parents.add(att.sailor.parent_id)
-                        bcc_addrs.append(att.sailor.parent.email)
+                        parent_bcc_addrs.append(att.sailor.parent.email)
 
-            # Deduplicate
-            to_addrs  = list(dict.fromkeys(a for a in to_addrs  if a))
-            bcc_addrs = list(dict.fromkeys(a for a in bcc_addrs if a and a not in to_addrs))
+            # Deduplicate within each list
+            to_addrs         = list(dict.fromkeys(a for a in to_addrs         if a))
+            bcc_addrs        = list(dict.fromkeys(a for a in bcc_addrs        if a and a not in to_addrs))
+            parent_bcc_addrs = list(dict.fromkeys(a for a in parent_bcc_addrs if a and a not in to_addrs))
 
-            if not to_addrs and not bcc_addrs:
+            if not to_addrs and not bcc_addrs and not parent_bcc_addrs:
                 flash('No recipients — select at least one group or add coaches/admins first.', 'warning')
                 return redirect(url_for('coach.attendance', session_id=session_id))
 
-            # Build email content (fetch weather here — not available in POST scope otherwise)
+            # Fetch weather once for both emails
             _wx = {}
             try:
                 _wx = wx.get_weather_for_sessions([sess])
             except Exception:
                 pass
-            subject, body_text, body_html = _build_summary_email(sess, _wx.get(sess.id))
+            session_wx = _wx.get(sess.id)
 
-            ok, err = send_email_multi(to_addrs, bcc_addrs, subject, body_text, body_html)
-            n = len(to_addrs) + len(bcc_addrs)
-            if ok:
-                flash(f'Summary sent to {n} recipient{"s" if n != 1 else ""}.', 'success')
+            errors = []
+            n_sent = 0
+
+            # ── Email 1: coaches / admins / accounting — includes private notes ──
+            if to_addrs or bcc_addrs:
+                subj, txt, html = _build_summary_email(sess, session_wx, include_private=True)
+                ok, err = send_email_multi(to_addrs, bcc_addrs, subj, txt, html)
+                if ok:
+                    n_sent += len(to_addrs) + len(bcc_addrs)
+                else:
+                    errors.append(err)
+
+            # ── Email 2: parents — public notes only ──────────────────────────
+            if parent_bcc_addrs:
+                subj, txt, html = _build_summary_email(sess, session_wx, include_private=False)
+                ok, err = send_email_multi([], parent_bcc_addrs, subj, txt, html)
+                if ok:
+                    n_sent += len(parent_bcc_addrs)
+                else:
+                    errors.append(err)
+
+            if errors:
+                flash(f'Email error: {"; ".join(errors)}', 'danger')
             else:
-                flash(f'Email failed: {err}', 'danger')
+                flash(f'Summary sent to {n_sent} recipient{"s" if n_sent != 1 else ""}.', 'success')
             return redirect(url_for('coach.attendance', session_id=session_id))
 
         # --- Save attendance + notes ---
