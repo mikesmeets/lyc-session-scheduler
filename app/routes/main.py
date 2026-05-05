@@ -144,6 +144,12 @@ def session_detail(session_id):
                 if signup.session_id == session_id:
                     my_signups[sailor.id] = signup
 
+    session_weather = None
+    try:
+        session_weather = wx.get_weather_for_sessions([session]).get(session.id)
+    except Exception:
+        pass
+
     return render_template('session.html',
         session=session,
         fleets=fleets,
@@ -151,6 +157,7 @@ def session_detail(session_id):
         my_other_sailors=my_other_sailors,
         my_signups=my_signups,
         today=date.today(),
+        session_weather=session_weather,
     )
 
 
