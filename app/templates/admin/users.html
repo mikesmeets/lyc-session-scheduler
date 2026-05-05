@@ -31,11 +31,19 @@
           <td>
             {% if user.is_admin %}
               <span class="badge bg-danger">Admin</span>
+            {% elif user.is_coach %}
+              <span class="badge bg-primary">Coach</span>
             {% else %}
               <span class="badge bg-secondary">Parent</span>
             {% endif %}
           </td>
-          <td>{{ user.sailors | length }}</td>
+          <td>
+            {% if user.is_admin or user.is_coach %}
+              <span class="text-muted">—</span>
+            {% else %}
+              {{ user.sailors | length }}
+            {% endif %}
+          </td>
           <td class="text-end">
             <a href="{{ url_for('admin.edit_user', user_id=user.id) }}"
                class="btn btn-sm btn-outline-primary">

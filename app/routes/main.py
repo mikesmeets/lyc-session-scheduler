@@ -230,9 +230,20 @@ def session_unsignup(session_id, sailor_id):
     return redirect(next_url or url_for('main.session_detail', session_id=session_id))
 
 
+def _parent_only():
+    """Return a redirect if the current user is not a plain parent, else None."""
+    if current_user.is_admin or current_user.is_coach:
+        flash('That page is for parent accounts only.', 'warning')
+        return redirect(url_for('main.index'))
+    return None
+
+
 @main.route('/my-sailors')
 @login_required
 def my_sailors():
+    denied = _parent_only()
+    if denied:
+        return denied
     fleets = Fleet.query.order_by(Fleet.name).all()
     waiver_links = WaiverLink.query.order_by(WaiverLink.sort_order, WaiverLink.name).all()
     return render_template('my_sailors.html', fleets=fleets, waiver_links=waiver_links, today=date.today())
@@ -241,6 +252,9 @@ def my_sailors():
 @main.route('/my-sailors/add', methods=['POST'])
 @login_required
 def add_sailor():
+    denied = _parent_only()
+    if denied:
+        return denied
     first_name = request.form.get('first_name', '').strip()
     last_name = request.form.get('last_name', '').strip()
     fleet_id = request.form.get('fleet_id', type=int)
@@ -291,6 +305,9 @@ def add_sailor():
 @main.route('/my-sailors/<int:sailor_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_sailor(sailor_id):
+    denied = _parent_only()
+    if denied:
+        return denied
     sailor = Sailor.query.get_or_404(sailor_id)
     if sailor.parent_id != current_user.id:
         flash('Not authorized.', 'danger')
@@ -344,6 +361,9 @@ def edit_sailor(sailor_id):
 @main.route('/my-sailors/<int:sailor_id>/submit-waiver', methods=['POST'])
 @login_required
 def submit_waiver(sailor_id):
+    denied = _parent_only()
+    if denied:
+        return denied
     sailor = Sailor.query.get_or_404(sailor_id)
     if sailor.parent_id != current_user.id:
         flash('Not authorized.', 'danger')
@@ -356,6 +376,9 @@ def submit_waiver(sailor_id):
 @main.route('/my-sailors/<int:sailor_id>/delete', methods=['POST'])
 @login_required
 def delete_sailor(sailor_id):
+    denied = _parent_only()
+    if denied:
+        return denied
     sailor = Sailor.query.get_or_404(sailor_id)
     if sailor.parent_id != current_user.id:
         flash('Not authorized.', 'danger')
