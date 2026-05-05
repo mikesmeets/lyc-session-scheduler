@@ -93,7 +93,7 @@ def _seed_data():
 
     if not User.query.filter_by(is_admin=True).first():
         db.session.add(User(
-            email='admin@lycsailing.org',
+            email='admin@larchmontyc.org',
             first_name='Admin',
             last_name='User',
             password_hash=generate_password_hash('admin'),
