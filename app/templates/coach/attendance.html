@@ -257,17 +257,13 @@
               </label>
             </div>
             {% endif %}
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="include_coaches"
-                     value="1" id="chk_coaches" checked>
-              <label class="form-check-label" for="chk_coaches">
-                Coaches
-                {% if sess.coaches %}
-                <span class="text-muted small">({{ sess.coaches | map(attribute='name') | join(', ') }})</span>
-                {% endif %}
-              </label>
-            </div>
           </div>
+          <p class="text-muted small mb-2 mt-1">
+            <i class="bi bi-info-circle me-1"></i>Session coaches always receive the summary.
+            {% if sess.coaches %}
+            <span class="text-dark">({{ sess.coaches | map(attribute='name') | join(', ') }})</span>
+            {% endif %}
+          </p>
           <button type="submit" name="action" value="publish"
                   class="btn btn-success w-100"
                   onclick="return confirm('Send session summary email now?')">

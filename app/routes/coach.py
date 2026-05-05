@@ -255,11 +255,11 @@ def attendance(session_id):
             to_addrs  = []   # visible in To: header
             bcc_addrs = []   # hidden (parents, accounting)
 
+            # Coaches attached to this session always receive the summary
+            to_addrs.extend(c.email for c in sess.coaches)
+
             if request.form.get('include_admins') == '1':
                 to_addrs.extend(u.email for u in User.query.filter_by(is_admin=True).all())
-
-            if request.form.get('include_coaches') == '1':
-                to_addrs.extend(c.email for c in sess.coaches)
 
             if request.form.get('include_accounting') == '1':
                 acct = AppSetting.get('accounting_email', '')
