@@ -661,12 +661,33 @@ def settings():
     if request.method == 'POST':
         fleet_lock = 'true' if request.form.get('fleet_lock') == 'on' else 'false'
         AppSetting.set('fleet_lock', fleet_lock)
+
+        # Weather location
+        lat_raw = request.form.get('weather_lat', '').strip()
+        lon_raw = request.form.get('weather_lon', '').strip()
+        try:
+            AppSetting.set('weather_lat', str(float(lat_raw)))
+        except ValueError:
+            flash('Latitude must be a number.', 'danger')
+            return redirect(url_for('admin.settings'))
+        try:
+            AppSetting.set('weather_lon', str(float(lon_raw)))
+        except ValueError:
+            flash('Longitude must be a number.', 'danger')
+            return redirect(url_for('admin.settings'))
+
         db.session.commit()
         flash('Settings saved.', 'success')
         return redirect(url_for('admin.settings'))
 
-    fleet_lock = AppSetting.get('fleet_lock', 'false') == 'true'
-    return render_template('admin/settings.html', fleet_lock=fleet_lock)
+    from .. import weather as wx
+    fleet_lock  = AppSetting.get('fleet_lock', 'false') == 'true'
+    weather_lat = AppSetting.get('weather_lat', str(wx._DEFAULT_LAT))
+    weather_lon = AppSetting.get('weather_lon', str(wx._DEFAULT_LON))
+    return render_template('admin/settings.html',
+                           fleet_lock=fleet_lock,
+                           weather_lat=weather_lat,
+                           weather_lon=weather_lon)
 
 
 # ── Email Configuration ────────────────────────────────────────────────────────

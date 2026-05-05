@@ -12,10 +12,21 @@ import urllib.request
 import urllib.parse
 from datetime import date, datetime
 
-# ── Location ──────────────────────────────────────────────────────────────────
-LAT      = 40.9281       # Larchmont, NY
-LON      = -73.7523
-TIMEZONE = 'America/New_York'
+# ── Location defaults (overridden by AppSetting in DB) ───────────────────────
+_DEFAULT_LAT = 40.9281   # Larchmont Yacht Club, NY
+_DEFAULT_LON = -73.7523
+TIMEZONE     = 'America/New_York'
+
+
+def _get_location() -> tuple:
+    """Return (lat, lon) from AppSetting, falling back to defaults."""
+    try:
+        from .models import AppSetting
+        lat = float(AppSetting.get('weather_lat') or _DEFAULT_LAT)
+        lon = float(AppSetting.get('weather_lon') or _DEFAULT_LON)
+        return lat, lon
+    except Exception:
+        return _DEFAULT_LAT, _DEFAULT_LON
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 _cache: dict = {}         # key -> (fetched_at, data)
@@ -99,12 +110,13 @@ def _http_get(url: str, params: dict):
 # ── API fetchers (cached) ──────────────────────────────────────────────────────
 
 def _fetch_forecast(days: int = 16):
-    key = f'forecast_{days}'
+    lat, lon = _get_location()
+    key = f'forecast_{days}_{lat}_{lon}'
     now = time.monotonic()
     if key in _cache and now - _cache[key][0] < FORECAST_TTL:
         return _cache[key][1]
     data = _http_get('https://api.open-meteo.com/v1/forecast', {
-        'latitude': LAT, 'longitude': LON,
+        'latitude': lat, 'longitude': lon,
         'hourly': ('temperature_2m,windspeed_10m,windgusts_10m,'
                    'winddirection_10m,precipitation_probability,weathercode'),
         'wind_speed_unit': 'kn',
@@ -117,12 +129,13 @@ def _fetch_forecast(days: int = 16):
 
 
 def _fetch_archive(start: date, end: date):
-    key = f'archive_{start}_{end}'
+    lat, lon = _get_location()
+    key = f'archive_{start}_{end}_{lat}_{lon}'
     now = time.monotonic()
     if key in _cache and now - _cache[key][0] < HISTORICAL_TTL:
         return _cache[key][1]
     data = _http_get('https://archive-api.open-meteo.com/v1/archive', {
-        'latitude': LAT, 'longitude': LON,
+        'latitude': lat, 'longitude': lon,
         'start_date': start.isoformat(),
         'end_date':   end.isoformat(),
         'hourly': ('temperature_2m,windspeed_10m,windgusts_10m,'
