@@ -3,6 +3,13 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db, login_manager
 
+# Many-to-many: sessions ↔ coaches
+session_coaches = db.Table(
+    'session_coaches',
+    db.Column('session_id', db.Integer, db.ForeignKey('session.id'),  primary_key=True),
+    db.Column('user_id',    db.Integer, db.ForeignKey('user.id'),     primary_key=True),
+)
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -17,6 +24,7 @@ class User(UserMixin, db.Model):
     audit_number = db.Column(db.String(50))
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    is_coach = db.Column(db.Boolean, default=False)
     sailors = db.relationship('Sailor', backref='parent', lazy=True, cascade='all, delete-orphan')
 
     @property
@@ -65,7 +73,11 @@ class Session(db.Model):
     commitment_deadline_days = db.Column(db.Integer, default=14)
     min_sailors = db.Column(db.Integer, default=5)
     status = db.Column(db.String(20), default='pending')  # pending, confirmed, cancelled
-    signups = db.relationship('Signup', backref='session', lazy=True, cascade='all, delete-orphan')
+    coach_notes_public  = db.Column(db.Text)   # visible to parents on schedule
+    coach_notes_private = db.Column(db.Text)   # admins + coaches only
+    signups  = db.relationship('Signup',     backref='session', lazy=True, cascade='all, delete-orphan')
+    coaches  = db.relationship('User', secondary='session_coaches', backref='coached_sessions', lazy=True)
+    attendances = db.relationship('Attendance', backref='session', lazy=True, cascade='all, delete-orphan')
 
     @property
     def commitment_deadline(self):
@@ -107,6 +119,25 @@ class WaiverLink(db.Model):
     fleet_id = db.Column(db.Integer, db.ForeignKey('fleet.id'), nullable=True)
     fleet = db.relationship('Fleet', backref='waiver_links')
     sort_order = db.Column(db.Integer, default=0)
+
+
+class Attendance(db.Model):
+    """Records whether a sailor was present at a session.
+
+    Covers both signed-up sailors and walk-ins (is_walkin=True).
+    A sailor with no Attendance record for a session is considered 'not yet marked'.
+    """
+    id         = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('session.id'), nullable=False)
+    sailor_id  = db.Column(db.Integer, db.ForeignKey('sailor.id'),  nullable=False)
+    present    = db.Column(db.Boolean, nullable=True)   # True=present, False=absent, None=unmarked
+    is_walkin  = db.Column(db.Boolean, default=False)   # True if sailor was not signed up
+    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sailor     = db.relationship('Sailor')
+
+    __table_args__ = (
+        db.UniqueConstraint('session_id', 'sailor_id', name='unique_attendance'),
+    )
 
 
 class EmailLog(db.Model):

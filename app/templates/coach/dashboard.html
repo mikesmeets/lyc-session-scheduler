@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Coach Dashboard{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Coach Dashboard</h2>
+
+{# ── Upcoming Sessions ── #}
+<h5 class="text-muted mb-2">Upcoming Sessions</h5>
+{% if upcoming %}
+<div class="table-responsive mb-4">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Fleet</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Attendance</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sess in upcoming %}
+      <tr>
+        <td><strong>{{ sess.date.strftime('%a, %b %#d, %Y') }}</strong></td>
+        <td>{{ sess.fleet.name }}</td>
+        <td class="text-muted small">
+          {{ sess.session_type.replace('_', ' ').title() }}
+        </td>
+        <td>
+          {% if sess.status == 'confirmed' %}
+            <span class="badge bg-success">Confirmed</span>
+          {% elif sess.status == 'cancelled' %}
+            <span class="badge bg-secondary">Cancelled</span>
+          {% else %}
+            <span class="badge bg-light text-dark border">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if sess.id in attended_ids %}
+            <span class="badge bg-info text-dark"><i class="bi bi-check2"></i> Taken</span>
+          {% else %}
+            <span class="text-muted small">—</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{{ url_for('coach.attendance', session_id=sess.id) }}"
+             class="btn btn-sm btn-primary">
+            <i class="bi bi-clipboard-check"></i> Attendance
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-info mb-4">No upcoming sessions assigned.</div>
+{% endif %}
+
+{# ── Past Sessions ── #}
+{% if past %}
+<h5 class="text-muted mb-2">Recent Past Sessions</h5>
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th>
+        <th>Fleet</th>
+        <th>Type</th>
+        <th>Attendance</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sess in past %}
+      <tr class="text-muted">
+        <td>{{ sess.date.strftime('%a, %b %#d, %Y') }}</td>
+        <td>{{ sess.fleet.name }}</td>
+        <td class="small">{{ sess.session_type.replace('_', ' ').title() }}</td>
+        <td>
+          {% if sess.id in attended_ids %}
+            <span class="badge bg-info text-dark"><i class="bi bi-check2"></i> Taken</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Missing</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{{ url_for('coach.attendance', session_id=sess.id) }}"
+             class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-clipboard-check"></i> View
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

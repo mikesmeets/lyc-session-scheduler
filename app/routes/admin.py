@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
-from ..models import Fleet, Session, Signup, Sailor, User, AppSetting, WaiverLink, EmailLog
+from ..models import Fleet, Session, Signup, Sailor, User, AppSetting, WaiverLink, EmailLog, Attendance
 from .. import db
 from ..email_utils import send_email
 
@@ -226,11 +226,13 @@ def session_detail(session_id):
                    .all())
     same_fleet  = [s for s in all_sailors if s.fleet_id == session.fleet_id  and s.id not in signed_up_ids]
     other_fleet = [s for s in all_sailors if s.fleet_id != session.fleet_id  and s.id not in signed_up_ids]
+    att_by_sailor = {a.sailor_id: a for a in session.attendances}
     return render_template('admin/session_detail.html',
                            session=session,
                            today=date.today(),
                            available_sailors=same_fleet,
-                           other_fleet_sailors=other_fleet)
+                           other_fleet_sailors=other_fleet,
+                           att_by_sailor=att_by_sailor)
 
 
 @admin_bp.route('/sessions/<int:session_id>/add-signup', methods=['POST'])
@@ -281,17 +283,20 @@ def admin_remove_signup(session_id, sailor_id):
 @admin_required
 def edit_session(session_id):
     session = Session.query.get_or_404(session_id)
-    fleets = Fleet.query.order_by(Fleet.name).all()
+    fleets  = Fleet.query.order_by(Fleet.name).all()
+    coaches = User.query.filter_by(is_coach=True).order_by(User.last_name, User.first_name).all()
     if request.method == 'POST':
         updated, error = _session_from_form(session)
         if error:
             flash(error, 'danger')
         else:
+            coach_ids = request.form.getlist('coach_ids', type=int)
+            updated.coaches = User.query.filter(User.id.in_(coach_ids)).all() if coach_ids else []
             updated.update_status()
             db.session.commit()
             flash('Session updated.', 'success')
             return redirect(url_for('admin.session_detail', session_id=session_id))
-    return render_template('admin/edit_session.html', session=session, fleets=fleets)
+    return render_template('admin/edit_session.html', session=session, fleets=fleets, coaches=coaches)
 
 
 @admin_bp.route('/sessions/<int:session_id>/cancel', methods=['POST'])
@@ -529,7 +534,9 @@ def new_user():
         email       = request.form.get('email', '').strip().lower()
         audit_number = request.form.get('audit_number', '').strip()
         password    = request.form.get('password', '')
-        is_admin    = request.form.get('is_admin') == '1'
+        role     = request.form.get('role', 'parent')
+        is_admin = (role == 'admin')
+        is_coach = (role == 'coach')
 
         if not first_name or not last_name or not email or not password:
             flash('First name, last name, email, and password are required.', 'danger')
@@ -545,6 +552,7 @@ def new_user():
             email=email,
             audit_number=audit_number or None,
             is_admin=is_admin,
+            is_coach=is_coach,
         )
         user.set_password(password)
         db.session.add(user)
@@ -565,7 +573,9 @@ def edit_user(user_id):
         user.last_name    = request.form.get('last_name', '').strip()
         user.audit_number = request.form.get('audit_number', '').strip() or None
         new_email = request.form.get('email', '').strip().lower()
-        is_admin  = request.form.get('is_admin') == '1'
+        role     = request.form.get('role', 'parent')
+        is_admin = (role == 'admin')
+        is_coach = (role == 'coach')
 
         if not user.first_name or not user.last_name or not new_email:
             flash('First name, last name, and email are required.', 'danger')
@@ -582,6 +592,7 @@ def edit_user(user_id):
 
         user.email    = new_email
         user.is_admin = is_admin
+        user.is_coach = is_coach
 
         new_password = request.form.get('password', '').strip()
         if new_password:

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Attendance — {{ sess.date.strftime('%b %#d, %Y') }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('coach.dashboard') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h2 class="mb-0">{{ sess.fleet.name }} — {{ sess.date.strftime('%A, %B %#d, %Y') }}</h2>
+    <div class="text-muted small">
+      {{ sess.session_type.replace('_',' ').title() }}
+      {% if sess.start_time %}&nbsp;·&nbsp;{{ sess.start_time }}{% if sess.end_time %}–{{ sess.end_time }}{% endif %}{% endif %}
+      &nbsp;·&nbsp;
+      {% if sess.status == 'confirmed' %}<span class="badge bg-success">Confirmed</span>
+      {% elif sess.status == 'cancelled' %}<span class="badge bg-secondary">Cancelled</span>
+      {% else %}<span class="badge bg-light text-dark border">Pending</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="save">
+
+  <div class="row g-4">
+    {# ── Left: Attendance table ── #}
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+          <span>Attendance</span>
+          <span class="text-muted fw-normal small">{{ (signups_sorted|length) + (walkin_records|length) }} sailors</span>
+        </div>
+
+        {% if signups_sorted or walkin_records %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Sailor</th>
+                <th>Fleet</th>
+                <th class="text-center" style="min-width:200px">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {# Signed-up sailors #}
+              {% for signup in signups_sorted %}
+              {% set sailor = signup.sailor %}
+              {% set att = att_by_sailor.get(sailor.id) %}
+              <tr>
+                <td class="ps-3">
+                  <strong>{{ sailor.name }}</strong>
+                  <span class="badge bg-{{ 'success' if signup.signup_type == 'commitment' else 'info text-dark' }} ms-1 small">
+                    {{ signup.signup_type }}
+                  </span>
+                </td>
+                <td class="text-muted small">{{ sailor.fleet.name }}</td>
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="att_{{ sailor.id }}"
+                           id="p_{{ sailor.id }}" value="present" autocomplete="off"
+                           {{ 'checked' if att and att.present == True }}>
+                    <label class="btn btn-outline-success" for="p_{{ sailor.id }}">Present</label>
+
+                    <input type="radio" class="btn-check" name="att_{{ sailor.id }}"
+                           id="a_{{ sailor.id }}" value="absent" autocomplete="off"
+                           {{ 'checked' if att and att.present == False }}>
+                    <label class="btn btn-outline-danger" for="a_{{ sailor.id }}">Absent</label>
+
+                    <input type="radio" class="btn-check" name="att_{{ sailor.id }}"
+                           id="u_{{ sailor.id }}" value="" autocomplete="off"
+                           {{ 'checked' if not att or att.present is none }}>
+                    <label class="btn btn-outline-secondary" for="u_{{ sailor.id }}">—</label>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+
+              {# Walk-ins #}
+              {% for att in walkin_records %}
+              {% set sailor = att.sailor %}
+              <tr class="table-warning">
+                <td class="ps-3">
+                  <strong>{{ sailor.name }}</strong>
+                  <span class="badge bg-warning text-dark ms-1 small">walk-in</span>
+                </td>
+                <td class="text-muted small">{{ sailor.fleet.name }}</td>
+                <td class="text-center">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="att_{{ sailor.id }}"
+                           id="p_{{ sailor.id }}" value="present" autocomplete="off"
+                           {{ 'checked' if att.present == True }}>
+                    <label class="btn btn-outline-success" for="p_{{ sailor.id }}">Present</label>
+
+                    <input type="radio" class="btn-check" name="att_{{ sailor.id }}"
+                           id="a_{{ sailor.id }}" value="absent" autocomplete="off"
+                           {{ 'checked' if att.present == False }}>
+                    <label class="btn btn-outline-danger" for="a_{{ sailor.id }}">Absent</label>
+
+                    <input type="radio" class="btn-check" name="att_{{ sailor.id }}"
+                           id="u_{{ sailor.id }}" value="" autocomplete="off"
+                           {{ 'checked' if att.present is none }}>
+                    <label class="btn btn-outline-secondary" for="u_{{ sailor.id }}">—</label>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="card-body text-muted">No sailors signed up for this session yet.</div>
+        {% endif %}
+
+        {# Add walk-in – separate form #}
+        {% if available_walkins %}
+        <div class="card-footer bg-white">
+          <div class="d-flex gap-2 align-items-end">
+            <div class="flex-grow-1">
+              <label class="form-label small text-muted mb-1">Add walk-in</label>
+              <select name="walkin_sailor_id" form="walkin_form" class="form-select form-select-sm">
+                <option value="">— select sailor —</option>
+                {% set fleet_sailors = available_walkins | selectattr('fleet_id', 'eq', sess.fleet_id) | list %}
+                {% set other_sailors = available_walkins | rejectattr('fleet_id', 'eq', sess.fleet_id) | list %}
+                {% if fleet_sailors %}
+                <optgroup label="{{ sess.fleet.name }}">
+                  {% for s in fleet_sailors %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                </optgroup>
+                {% endif %}
+                {% if other_sailors %}
+                <optgroup label="Other fleets">
+                  {% for s in other_sailors %}<option value="{{ s.id }}">{{ s.name }} — {{ s.fleet.name }}</option>{% endfor %}
+                </optgroup>
+                {% endif %}
+              </select>
+            </div>
+            <button type="submit" form="walkin_form" class="btn btn-sm btn-warning">
+              <i class="bi bi-plus-lg"></i> Add Walk-in
+            </button>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── Right: Notes ── #}
+    <div class="col-lg-5">
+      <div class="card mb-3">
+        <div class="card-header fw-bold">
+          <i class="bi bi-megaphone me-1"></i>Public Notes
+          <span class="text-muted fw-normal small ms-1">— sent to parents</span>
+        </div>
+        <div class="card-body">
+          <textarea name="coach_notes_public" class="form-control" rows="6"
+                    placeholder="Session summary, highlights, things to practice…">{{ sess.coach_notes_public or '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header fw-bold">
+          <i class="bi bi-lock me-1"></i>Private Notes
+          <span class="text-muted fw-normal small ms-1">— coaches &amp; admins only</span>
+        </div>
+        <div class="card-body">
+          <textarea name="coach_notes_private" class="form-control" rows="5"
+                    placeholder="Internal observations, follow-ups…">{{ sess.coach_notes_private or '' }}</textarea>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="bi bi-floppy me-1"></i>Save Attendance &amp; Notes
+      </button>
+    </div>
+  </div>
+</form>
+
+{# Walk-in form (separate so it doesn't interfere with the main save) #}
+<form id="walkin_form" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="add_walkin">
+</form>
+{% endblock %}

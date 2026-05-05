@@ -31,9 +31,16 @@
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('main.index') }}">Schedule</a>
         </li>
-        {% if current_user.is_authenticated and not current_user.is_admin %}
+        {% if current_user.is_authenticated and not current_user.is_admin and not current_user.is_coach %}
         <li class="nav-item">
           <a class="nav-link" href="{{ url_for('main.my_sailors') }}">My Sailors</a>
+        </li>
+        {% endif %}
+        {% if current_user.is_authenticated and (current_user.is_coach or current_user.is_admin) %}
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('coach.dashboard') }}">
+            <i class="bi bi-clipboard-check me-1"></i>Coach
+          </a>
         </li>
         {% endif %}
         {% if current_user.is_authenticated and current_user.is_admin %}

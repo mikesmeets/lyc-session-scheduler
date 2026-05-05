@@ -39,10 +39,12 @@ def create_app():
     from .routes.main import main
     from .routes.auth import auth
     from .routes.admin import admin_bp
+    from .routes.coach import coach_bp
 
     app.register_blueprint(main)
     app.register_blueprint(auth)
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(coach_bp, url_prefix='/coach')
 
     with app.app_context():
         db.create_all()
