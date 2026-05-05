@@ -51,10 +51,11 @@ def create_app():
         try:
             from flask_migrate import upgrade as _db_upgrade
             _db_upgrade()
+            db.create_all()
+            _seed_data()
         except Exception as e:
-            app.logger.warning('flask db upgrade failed (may be fine on first run): %s', e)
-        db.create_all()
-        _seed_data()
+            app.logger.error('Startup DB setup failed: %s', e)
+            raise
 
     return app
 
